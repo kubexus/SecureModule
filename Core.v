@@ -1,10 +1,10 @@
 module Core (
 	input wire clk,
 	
-	input wire [0:FRAME_SIZE] Fin_j,
-	input wire Fin_j_valid,
-	input wire [0:FRAME_SIZE] Fin_t,
-	input wire Fin_t_valid,
+	input wire [0:FRAME_SIZE] 	Fin_j,
+	input wire 						Fin_j_valid,
+	input wire [0:FRAME_SIZE] 	Fin_t,
+	input wire 						Fin_t_valid,
 	
 	input wire confirm_from_tajny,
 	input wire confirm_from_tajny_valid,
@@ -13,37 +13,40 @@ module Core (
 	input wire confirm_from_jawny_valid,
 	
 	output wire [0:FRAME_SIZE] Fout_j,
-	output wire Fout_j_valid,
+	output wire 					Fout_j_valid,
 	output wire [0:FRAME_SIZE] Fout_t,
-	output wire Fout_t_valid,
+	output wire 					Fout_t_valid,
 	
-	output reg confirm_tajny,
-	output reg [7:0] confirm_code,
-	output reg confirm_jawny
+	output reg 			confirm_tajny,
+	output reg 			confirm_jawny,
+	output reg [7:0] 	confirm_code
+	
 );
 
 
-parameter DATA_SIZE = 64;
+parameter DATA_SIZE 		= 64;
 parameter PREAMBLE_SIZE = 7;
-parameter CRC_SIZE = 4;
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1;
+parameter CRC_SIZE 		= 4;
+parameter FRAME_SIZE 	= (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1;
 
-
+parameter [32:0] CRC_POLY = 33'h104c11db7;
 
 
 reg [0:FRAME_SIZE] frame;
 reg [0:FRAME_SIZE] frame_crc;
 
-
-reg first;
-reg confirm;
-reg 	[0:31] 		lastFrameNr;
-parameter [32:0] CRC_POLY = 33'h104c11db7;
-
-reg fout_j_valid, fout_t_valid;
-reg [1:0] which;
+reg [0:31] 	lastFrameNr;
+reg [1:0] 	which;
+reg 			first;
+reg 			confirm;
+reg 			fout_j_valid; 
+reg			fout_t_valid;
 
 integer counter;
+
+
+
+reg [7:0] state;
 parameter [7:0]	IDLE 							= 8'b00000001,
 						VALID_TYPE					= 8'b00000010,
 						CRC_CHECK 					= 8'b00000100,
@@ -52,7 +55,7 @@ parameter [7:0]	IDLE 							= 8'b00000001,
 						HARD_RESET					= 8'b00100000,
 						SIGN_ERROR					= 8'b01000000,
 						PASS_FRAME					= 8'b10000000;
-reg [7:0] state;
+
 						
 						
 // TYPY RAMEK
@@ -77,17 +80,17 @@ parameter [1:0] JAWNY = 2'b01;
 parameter [1:0] TAJNY = 2'b10;
 
 initial begin
-	counter <= 0;
-	frame <= {FRAME_SIZE+1{8'h00}};
-	frame_crc <= {FRAME_SIZE+1{8'h00}};
-	state <= IDLE;
-	fout_j_valid <= 1'b0;
-	fout_t_valid <= 1'b0;
-	which <= 2'b00;
-	first <= 1'b0;
-	confirm <= 1'b1;
-	confirm_code <= 8'h00;
-	lastFrameNr 		<= {32{1'b0}};
+	counter 			<= 0;
+	frame 			<= {FRAME_SIZE+1{1'b0}};
+	frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+	state 			<= IDLE;
+	fout_j_valid 	<= 1'b0;
+	fout_t_valid 	<= 1'b0;
+	which 			<= 2'b00;
+	first 			<= 1'b0;
+	confirm 			<= 1'b1;
+	confirm_code 	<= 8'h00;
+	lastFrameNr 	<= {32{1'b0}};
 end
 						
 						
@@ -256,29 +259,29 @@ always @ (posedge clk) begin
 		end
 		
 		HARD_RESET: begin
-			counter <= 0;
-			frame <= {FRAME_SIZE+1{1'b0}};
-			frame_crc <= {FRAME_SIZE+1{1'b0}};
-			state <= IDLE;
-			fout_j_valid <= 1'b0;
-			fout_t_valid <= 1'b0;
-			which <= 2'b00;
-			first <= 1'b0;
-			confirm <= 1'b1;
-			confirm_code <= 8'h00;
-			lastFrameNr 		<= {32{1'b0}};
+			counter 			<= 0;
+			frame 			<= {FRAME_SIZE+1{1'b0}};
+			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+			state 			<= IDLE;
+			fout_j_valid 	<= 1'b0;
+			fout_t_valid 	<= 1'b0;
+			which 			<= 2'b00;
+			first 			<= 1'b0;
+			confirm 			<= 1'b1;
+			confirm_code 	<= 8'h00;
+			lastFrameNr 	<= {32{1'b0}};
 		end
 		
 		RESET: begin
-			confirm <= 1'b0;
-			counter <= 0;
-			frame <= {FRAME_SIZE+1{1'b0}};
-			frame_crc <= {FRAME_SIZE+1{1'b0}};
-			state <= IDLE;
-			fout_j_valid <= 1'b0;
-			fout_t_valid <= 1'b0;
-			which <= 2'b00;
-			confirm_code <= 8'h00;
+			confirm 			<= 1'b0;
+			counter 			<= 0;
+			frame				<= {FRAME_SIZE+1{1'b0}};
+			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+			state 			<= IDLE;
+			fout_j_valid 	<= 1'b0;
+			fout_t_valid 	<= 1'b0;
+			which 			<= 2'b00;
+			confirm_code 	<= 8'h00;
 		end
 		
 		

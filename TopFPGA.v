@@ -6,21 +6,18 @@ module TopFPGA (
 	input wire RX_TAJNY,
 	
 	output wire TX_JAWNY,
-	output wire TX_TAJNY,
-	
-	output wire lampka
+	output wire TX_TAJNY
 	
 );
-
-assign lampka = signalt  && signalj;
 
 parameter DATA_SIZE 			= 64;
 parameter PREAMBLE_SIZE 	= 7;
 parameter CRC_SIZE 			= 4;
+
 parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1;
 
 // TYPY RAMEK
-parameter [7:0]	FIRST_FRAME 		=	8'h00;
+parameter [7:0]	FIRST_FRAME 		=	8'h10;
 parameter [7:0]	LAST_FRAME 			=	8'h01;
 parameter [7:0]	NORMALNA 			=	8'h02;
 parameter [7:0]	POJEDYNCZA 			=	8'h03;
@@ -36,7 +33,6 @@ parameter [7:0] 	OKAY					=	8'h05;
 parameter [7:0]	ERROR 				=	8'h04;
 parameter [7:0]	FATAL_ERROR			= 	8'h08;
 
-wire signalj, signalt;
 
 wire [0:FRAME_SIZE] fout_j, fout_t;
 wire fout_j_valid, fout_t_valid;
@@ -46,7 +42,7 @@ wire fin_j_valid, fin_t_valid;
 
 wire semafor_j, semafor_t;
 
-wire aes_reset, aes_start, aes_take;
+//wire aes_reset, aes_start, aes_take;
 
 //wire [95:0] aes_nonce;
 //wire [127:0] aes_stream;
@@ -76,20 +72,19 @@ Interface #(
 	.LAST_FRAME 	   (LAST_FRAME)) 
 	
 	JAWNY (
-		.clk						(clk),
-		.RX						(RX_JAWNY),
-		.semafor_in				(semafor_t),
-		.fin						(fin_j),
-		.confirm					(confirm_jawny),
-		.fin_valid				(fin_j_valid),
-		.conf_code				(confirm_code),
-		.confirm_from_PC		(confirm_from_jawny),
+		.clk							(clk),
+		.RX							(RX_JAWNY),
+		.semafor_in					(semafor_t),
+		.fin							(fin_j),
+		.confirm						(confirm_jawny),
+		.fin_valid					(fin_j_valid),
+		.conf_code					(confirm_code),
+		.confirm_from_PC			(confirm_from_jawny),
 		.confirm_from_PC_valid	(confirm_from_jawny_valid),
-		.signal					(signalj),
-		.fout						(fout_j),
-		.fout_valid				(fout_j_valid),    
-	   .TX						(TX_JAWNY),
-      .semafor_out			(semafor_j));
+		.fout							(fout_j),
+		.fout_valid					(fout_j_valid),    
+	   .TX							(TX_JAWNY),
+      .semafor_out				(semafor_j));
 
 Interface #(
 	.DATA_SIZE 			(DATA_SIZE),
@@ -105,20 +100,19 @@ Interface #(
 	.LAST_FRAME 	   (LAST_FRAME)) 
 	
 	TAJNY (
-		.clk						(clk),
-		.RX						(RX_TAJNY),
-		.semafor_in				(semafor_j),
-		.fin						(fin_t),
-		.fin_valid				(fin_t_valid),
-		.confirm					(confirm_tajny),
-		.conf_code				(confirm_code),
-		.confirm_from_PC		(confirm_from_tajny),
+		.clk							(clk),
+		.RX							(RX_TAJNY),
+		.semafor_in					(semafor_j),
+		.fin							(fin_t),
+		.fin_valid					(fin_t_valid),
+		.confirm						(confirm_tajny),
+		.conf_code					(confirm_code),
+		.confirm_from_PC			(confirm_from_tajny),
 		.confirm_from_PC_valid	(confirm_from_tajny_valid),
-		.signal					(signalt),
-		.fout						(fout_t),
-		.fout_valid				(fout_t_valid),
-	   .TX						(TX_TAJNY),
-      .semafor_out			(semafor_t));	
+		.fout							(fout_t),
+		.fout_valid					(fout_t_valid),
+	   .TX							(TX_TAJNY),
+      .semafor_out				(semafor_t));	
 	
 Core # (
 	.DATA_SIZE 			(DATA_SIZE),
@@ -134,15 +128,15 @@ Core # (
 	.LAST_FRAME 	   (LAST_FRAME)) 
 
 	serce (
-		.clk						(clk),
-		.Fin_j					(fout_j),
-		.Fin_j_valid			(fout_j_valid),
-		.Fin_t					(fout_t),
-		.Fin_t_valid			(fout_t_valid),
-		.confirm_from_tajny  (confirm_from_tajny),
-		.confirm_from_tajny_valid (confirm_from_tajny_valid),
-		.confirm_from_jawny	(confirm_from_jawny),
-		.confirm_from_jawny_valid (confirm_from_jawny_valid),
+		.clk								(clk),
+		.Fin_j							(fout_j),
+		.Fin_j_valid					(fout_j_valid),
+		.Fin_t							(fout_t),
+		.Fin_t_valid					(fout_t_valid),
+		.confirm_from_tajny  		(confirm_from_tajny),
+		.confirm_from_tajny_valid	(confirm_from_tajny_valid),
+		.confirm_from_jawny			(confirm_from_jawny),
+		.confirm_from_jawny_valid 	(confirm_from_jawny_valid),
 		
 		.confirm_jawny			(confirm_jawny),
 		.confirm_tajny			(confirm_tajny),
@@ -152,6 +146,5 @@ Core # (
 		.Fout_t					(fin_t),
 		.Fout_t_valid			(fin_t_valid));
 	
-//assign init = 1'b0;
 
 endmodule

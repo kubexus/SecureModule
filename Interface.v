@@ -1,29 +1,30 @@
 module Interface (
 
-	input wire clk,
-	input wire RX,
-	input wire semafor_in,
-	input wire [0:FRAME_SIZE] fin,
-	input wire fin_valid,
+	input wire 	clk,
+	input wire 	RX,
+	input wire 	semafor_in,
 	
-	input wire confirm,
-	input wire [7:0] conf_code,
+	input wire 	[0:FRAME_SIZE] fin,
+	input wire 						fin_valid,
+	
+	input wire 						confirm,
+	input wire 	[7:0] 			conf_code,
 	
 	output wire [0:FRAME_SIZE] fout,
-	output reg fout_valid,
-	output reg TX,
-	output reg semafor_out,
-	output reg signal,
+	output reg 						fout_valid,
+	output reg 						semafor_out,
 	
-	output reg confirm_from_PC,
-	output reg confirm_from_PC_valid
+	output reg 	[7:0]				confirm_from_PC,
+	output reg 						confirm_from_PC_valid,
+	
+	output reg TX
 	
 );
 
-parameter DATA_SIZE = 64;
-parameter PREAMBLE_SIZE = 7;
-parameter CRC_SIZE = 4;
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1; // in bits
+parameter DATA_SIZE 			= 64;
+parameter PREAMBLE_SIZE 	= 7;
+parameter CRC_SIZE 			= 4;
+parameter FRAME_SIZE 		= (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1; // in bits
 
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -45,27 +46,26 @@ parameter [7:0]	FATAL_ERROR			= 	8'h08;
 parameter [6:0]	IDLE 					= 7'b0000001,
 						RECEIVING 			= 7'b0000010,
 						TRANSMITTING 		= 7'b0000100,
-						WAIT_FOR_CONF 				= 7'b0001000,
+						WAIT_FOR_CONF 		= 7'b0001000,
 						WAIT			 		= 7'b0010000,
 						CONFIRM				= 7'b0100000,
 						RESET					= 7'b1000000;
 						
-reg 	[6:0] 		state; 
+reg 	[6:0] 			state; 
 			
 reg 	[0:FRAME_SIZE] frame;
+reg 	[7:0] 			byte_out;
+reg						frame_loaded;
 
-reg 	[0:31] 		lastFrameNr; // numer poprzedniej ramki
-reg 	[7:0] 		byte_out;
- 
-reg					frame_loaded;
-integer 				counter_r, counter_s;
-reg 					to_escape;
-reg					sent;
-wire 	[7:0] 		byte_in;
-wire 					byte_ready;
-wire 					tx_ready;
-reg 					transmit_frame;
-wire 					transmit;
+reg 						to_escape;
+wire 	[7:0] 			byte_in;
+wire 						byte_ready;
+wire 						tx_ready;
+
+reg 						transmit_frame;
+wire 						transmit;
+
+integer 					counter_r, counter_s; // liczniki receivera i tranmittera
 
 wire init	=	1'b0;
 
@@ -88,20 +88,17 @@ RS232_RECEIVER receiver (
 
 
 initial begin
-	frame 				<= {FRAME_SIZE+1{8'h00}};
-	fout_valid 			<= 1'b0;
-	lastFrameNr 		<= {32{1'b0}};
-	frame_loaded 		<= 1'b0;
-	transmit_frame		<=	1'b0;
-	byte_out 			<= 8'h00;
-	counter_r 			<= 0;
-	counter_s			<=	0;
-	sent					<= 1'b0;
-	to_escape 			<= 1'b0;
-	state					<=	IDLE;
-	signal				<= 1'b1;
-	semafor_out			<= 1'b0;
-	confirm_from_PC	<= 1'b0;
+	frame 						<= {FRAME_SIZE+1{1'b0}};
+	fout_valid 					<= 1'b0;
+	frame_loaded 				<= 1'b0;
+	transmit_frame				<=	1'b0;
+	byte_out 					<= 8'h00;
+	counter_r 					<= 0;
+	counter_s					<=	0;
+	to_escape 					<= 1'b0;
+	state							<=	IDLE;
+	semafor_out					<= 1'b0;
+	confirm_from_PC			<= 1'b0;
 	confirm_from_PC_valid	<= 1'b0;
 end
 
@@ -109,7 +106,6 @@ end
 always @ (posedge clk) begin
 	if (byte_ready && byte_in == 8'h08) begin
 		state <= RESET;
-		lastFrameNr 		<= {32{1'b0}};
 		semafor_out			<= 1'b0;
 	end
 case(state)
@@ -145,7 +141,6 @@ case(state)
 						fout_valid <= 1'b1;
 						//frame_loaded <= 1'b1;
 						state <= CONFIRM;
-						signal <= 1'b0;
 					end else begin			// nie odebrano calej ramki, counter za maly
 						transmit_frame <= 1'b1;
 						byte_out <= ERROR;
@@ -252,17 +247,16 @@ case(state)
 	end
 	
 	RESET: begin
-		frame 				<= {FRAME_SIZE+1{8'h00}};
-		fout_valid 			<= 1'b0;
-		frame_loaded 		<= 1'b0;
-		transmit_frame		<=	1'b0;
-		byte_out 			<= 8'h0f;
-		counter_r 			<= 0;
-		counter_s			<=	0;
-		sent					<= 1'b0;
-		to_escape 			<= 1'b0;
-		state					<=	IDLE;
-		confirm_from_PC	<= 1'b0;
+		frame 						<= {FRAME_SIZE+1{1'b0}};
+		fout_valid 					<= 1'b0;
+		frame_loaded 				<= 1'b0;
+		transmit_frame				<=	1'b0;
+		byte_out 					<= 8'h0f;
+		counter_r 					<= 0;
+		counter_s					<=	0;
+		to_escape 					<= 1'b0;
+		state							<=	IDLE;
+		confirm_from_PC			<= 1'b0;
 		confirm_from_PC_valid	<= 1'b0;
 	end
 	
