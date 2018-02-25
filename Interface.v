@@ -45,17 +45,18 @@ parameter [7:0] 	OKAY					=	8'h05;
 parameter [7:0]	ERROR 				=	8'h04;
 parameter [7:0]	FATAL_ERROR			= 	8'h08;
 
-parameter [8:0]	IDLE 					= 9'b000000001,
-						RECEIVING 			= 9'b000000010,
-						TRANSMITTING 		= 9'b000000100,
-						WAIT_FOR_CONF 		= 9'b000001000,
-						WAIT_TX			 	= 9'b000010000,
-						CONFIRM				= 9'b000100000,
-						RESET					= 9'b001000000,
-						WAIT_CLK				= 9'b010000000,
-						WAIT_LONG			= 9'b100000000;    
+parameter [9:0]	IDLE 					= 10'b0000000001,
+						RECEIVING 			= 10'b0000000010,
+						TRANSMITTING 		= 10'b0000000100,
+						WAIT_FOR_CONF 		= 10'b0000001000,
+						WAIT_TX			 	= 10'b0000010000,
+						CONFIRM				= 10'b0000100000,
+						RESET					= 10'b0001000000,
+						WAIT_CLK				= 10'b0010000000,
+						WAIT_LONG			= 10'b0100000000,
+						HARD_RESET			= 10'b1000000000;        
 						
-reg 	[8:0] 			state; 
+reg 	[9:0] 			state; 
 
 reg [7:0]	confirm_from_PC;
 reg 			confirm_from_PC_valid;
@@ -137,22 +138,13 @@ assign diod9 = dioda9;
 assign diod10 = dioda10;
 
 always @ (posedge clk) begin
-//	if (byte_ready && byte_in == 8'h08) begin
-//		state 				<= RESET;
-//		semafor_out			<= 1'b0;
-//	end
+
 case(state)
 	IDLE: begin
 		if (fout_valid) begin
 			fout_valid <= 1'b0;
 		end
 		if (fin_valid) begin
-//			if (temp) begin
-//				dioda6 <= 1'b1;
-//			end
-//			if (!temp) begin
-//				dioda7 <= 1'b1;
-//			end
 			frame <= fin;
 			transmit_frame <= 1'b1;
 			state <= TRANSMITTING;
@@ -161,6 +153,9 @@ case(state)
 			if (byte_in == FRAME_START && !semafor_in) begin
 				state <= RECEIVING;
 				semafor_out <= 1'b1;
+			end
+			if (byte_in == FATAL_ERROR) begin
+				state <= HARD_RESET;
 			end
 		end
 	end
@@ -271,21 +266,19 @@ case(state)
 	end
 	
 	WAIT_LONG: begin
-			//dioda3 <= 1'b1;
 			if (count_clk == 20) begin
-				//dioda4 <= 1'b1;
-				state <= RESET;
-				
+				if (confirm_from_PC == FATAL_ERROR) begin
+					state <= HARD_RESET;
+				end else begin
+					state <= RESET;
+				end
 			end
 			count_clk <= count_clk + 1;
 		end
 	
 	WAIT_TX: begin
-		//dioda3 <= 1'b1;
-		//transmit_frame <= 1'b1;
 		if (tx_ready) begin
 			state <= RESET;
-			//dioda4 <= 1'b1;
 		end
 	end
 	
@@ -296,11 +289,9 @@ case(state)
 	WAIT_FOR_CONF: begin // czeka na confirm od peceta
 		dioda1 <= 1'b1;
 		if (byte_ready) begin
-			//transmit_frame <= 1'b0;
-			//dioda2 <= 1'b1;
-			confirm_from_PC <= byte_in;
-			confirm_from_PC_valid <= 1'b1;
-			state <= WAIT_LONG; // zamiast WAIT_CLK
+				confirm_from_PC <= byte_in;
+				confirm_from_PC_valid <= 1'b1;
+				state <= WAIT_LONG; // zamiast WAIT_CLK
 		end
 	end
 	
@@ -312,9 +303,23 @@ case(state)
 		end
 	end
 	
+	HARD_RESET: begin
+		frame 						<= {FRAME_SIZE+1{1'b0}};
+		fout_valid 					<= 1'b0;
+		frame_loaded 				<= 1'b0;
+		transmit_frame				<=	1'b0;
+		byte_out 					<= 8'h00;
+		counter_r 					<= 0;
+		counter_s					<=	0;
+		to_escape 					<= 1'b0;
+		state							<=	IDLE;
+		semafor_out					<= 1'b0;
+		confirm_from_PC			<= 8'h00;
+		confirm_from_PC_valid	<= 1'b0;
+		count_clk					<= 0;
+	end
+	
 	RESET: begin
-		//dioda5 <= 1'b1;
-		//temp <= 1'b1;
 		frame 						<= {FRAME_SIZE+1{1'b0}};
 		count_clk 					<= 0;
 		fout_valid 					<= 1'b0;

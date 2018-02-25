@@ -7,7 +7,7 @@ module Core (
 	input wire 						Fin_t_valid,
 	
 	input wire [7:0]				confirm_from_tajny,
-	input wire confirm_from_tajny_valid,
+	input wire 						confirm_from_tajny_valid,
 	
 	input wire [7:0]				confirm_from_jawny,
 	input wire 						confirm_from_jawny_valid,
@@ -17,9 +17,9 @@ module Core (
 	output wire [0:FRAME_SIZE] Fout_t,
 	output wire 					Fout_t_valid,
 	
-	output wire 			conf_tajny,
-	output wire 			conf_jawny,
-	output wire [7:0] 	conf_code,
+	output wire 					conf_tajny,
+	output wire 					conf_jawny,
+	output wire [7:0] 			conf_code,
 	output wire diod1, diod2, diod3, diod4, diod5, diod6, diod7, diod8, diod9, diod10
 	
 );
@@ -48,8 +48,6 @@ reg [7:0] 	confirm_code;
 integer counter;
 integer count_clk;
 
-
-
 reg [9:0] state;
 parameter [9:0]	IDLE 							= 10'b0000000001,
 						VALID_TYPE					= 10'b0000000010,
@@ -61,8 +59,6 @@ parameter [9:0]	IDLE 							= 10'b0000000001,
 						PASS_FRAME					= 10'b0010000000,
 						WAIT_CLK						= 10'b0100000000,
 						WAIT_TX						= 10'b1000000000;  
-
-						
 						
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -86,7 +82,7 @@ parameter [1:0] JAWNY = 2'b01;
 parameter [1:0] TAJNY = 2'b10;
 
 reg dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10;
-
+reg fat_err;
 initial begin
 	counter 			<= 0;
 	frame 			<= {FRAME_SIZE+1{1'b0}};
@@ -98,7 +94,7 @@ initial begin
 	first 			<= 1'b0;
 	confirm_code 	<= 8'h00;
 	lastFrameNr 	<= {32{1'b0}};
-	
+	fat_err			<=	1'b0;
 	
 	dioda1 			<= 1'b0;
 	dioda2 			<= 1'b0;
@@ -250,11 +246,12 @@ always @ (posedge clk) begin
 		end
 		
 		WAIT_TX: begin
-			if (count_clk == 1000) begin
-//				confirm_jawny <= 1'b1;
-//				confirm_tajny <= 1'b1;
-				//dioda8 <= 1'b1;
-				state <= PASS_FRAME;
+			if (count_clk == 450) begin // bylo 1000
+				if (fat_err) begin
+					state <= HARD_RESET;
+				end else begin
+					state <= PASS_FRAME;
+				end
 			end
 			count_clk <= count_clk + 1;
 		end
@@ -282,8 +279,9 @@ always @ (posedge clk) begin
 						if (confirm_from_jawny == FATAL_ERROR) begin
 							//dioda10 <= 1'b1;
 							confirm_code <= FATAL_ERROR;
+							fat_err <= 1'b1;
 							confirm_tajny <= 1'b1;
-							state <= HARD_RESET;
+							state <= WAIT_TX;
 						end
 						if (confirm_from_jawny != OKAY && confirm_from_jawny != ERROR && confirm_from_jawny != FATAL_ERROR) begin
 							dioda10 <= 1'b1;
@@ -333,7 +331,6 @@ always @ (posedge clk) begin
 		end
 		
 		HARD_RESET: begin
-			count_clk		<= 0;
 			counter 			<= 0;
 			frame 			<= {FRAME_SIZE+1{1'b0}};
 			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
@@ -344,6 +341,7 @@ always @ (posedge clk) begin
 			first 			<= 1'b0;
 			confirm_code 	<= 8'h00;
 			lastFrameNr 	<= {32{1'b0}};
+			fat_err			<=	1'b0;
 		end
 		
 		RESET: begin
@@ -358,7 +356,6 @@ always @ (posedge clk) begin
 			fout_j_valid 	<= 1'b0;
 			fout_t_valid 	<= 1'b0;
 			which 			<= 2'b00;
-			//confirm_code 	<= 8'h00;
 		end
 		
 		
