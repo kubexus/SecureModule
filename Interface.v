@@ -154,9 +154,9 @@ case(state)
 				state <= RECEIVING;
 				semafor_out <= 1'b1;
 			end
-			if (byte_in == FATAL_ERROR) begin
-				state <= HARD_RESET;
-			end
+			//if (byte_in == FATAL_ERROR) begin
+			//	state <= HARD_RESET;
+			//end
 		end
 	end
 	RECEIVING: begin
@@ -177,7 +177,7 @@ case(state)
 						state <= CONFIRM;
 					end else begin			// nie odebrano calej ramki, counter za maly
 						transmit_frame <= 1'b1;
-						byte_out <= 8'h66;
+						byte_out <= ERROR;
 						state <= WAIT_TX;
 					end
 				end
@@ -239,17 +239,22 @@ case(state)
 				to_escape <= 1'b0;
 				counter_s <= counter_s + 1;
 			end
-			if (counter_s > 0 && counter_s <= DATA_SIZE+11) begin
+			if (counter_s == 1) begin
+				byte_out <= frame[0:7];
+				to_escape <= 1'b0;
+				counter_s <= counter_s + 1;
+			end
+			if (counter_s > 1 && counter_s <= DATA_SIZE+11) begin
 				if (to_escape) begin
-					byte_out <= (frame[(counter_s+1)*8+:8] ^ ESC_XOR);
+					byte_out <= (frame[(counter_s-1)*8+:8] ^ ESC_XOR);
 					to_escape <= 1'b0;
 					counter_s <= counter_s + 1;
 				end else begin
-					if (frame[(counter_s+1)*8+:8] == FRAME_END || frame[(counter_s+1)*8+:8] == FRAME_START || frame[(counter_s+1)*8+:8] == ESC_VAL) begin // dodac eskejpowanie bajtu eskejpacji
+					if (frame[(counter_s-1)*8+:8] == FRAME_END || frame[(counter_s-1)*8+:8] == FRAME_START || frame[(counter_s-1)*8+:8] == ESC_VAL) begin // dodac eskejpowanie bajtu eskejpacji
 						byte_out <= ESC_VAL;
 						to_escape <= 1'b1;
 					end else begin
-						byte_out <= frame[(counter_s+1)*8+:8];
+						byte_out <= frame[(counter_s-1)*8+:8];
 						counter_s <= counter_s + 1;
 					end
 				end
@@ -267,11 +272,11 @@ case(state)
 	
 	WAIT_LONG: begin
 			if (count_clk == 20) begin
-				if (confirm_from_PC == FATAL_ERROR) begin
-					state <= HARD_RESET;
-				end else begin
+				//if (confirm_from_PC == FATAL_ERROR) begin
+				//	state <= HARD_RESET;
+				//end else begin
 					state <= RESET;
-				end
+				//end
 			end
 			count_clk <= count_clk + 1;
 		end
