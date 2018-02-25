@@ -17,7 +17,9 @@ module Interface (
 	output wire 	[7:0]				conf_from_PC,
 	output wire 						conf_from_PC_valid,
 	
-	output reg TX
+	output reg TX,
+	
+	output wire diod1, diod2, diod3, diod4, diod5, diod6, diod7, diod8, diod9, diod10
 	
 );
 
@@ -43,19 +45,20 @@ parameter [7:0] 	OKAY					=	8'h05;
 parameter [7:0]	ERROR 				=	8'h04;
 parameter [7:0]	FATAL_ERROR			= 	8'h08;
 
-parameter [7:0]	IDLE 					= 8'b00000001,
-						RECEIVING 			= 8'b00000010,
-						TRANSMITTING 		= 8'b00000100,
-						WAIT_FOR_CONF 		= 8'b00001000,
-						WAIT_TX			 	= 8'b00010000,
-						CONFIRM				= 8'b00100000,
-						RESET					= 8'b01000000,
-						WAIT_CLK				= 8'b10000000;
+parameter [8:0]	IDLE 					= 9'b000000001,
+						RECEIVING 			= 9'b000000010,
+						TRANSMITTING 		= 9'b000000100,
+						WAIT_FOR_CONF 		= 9'b000001000,
+						WAIT_TX			 	= 9'b000010000,
+						CONFIRM				= 9'b000100000,
+						RESET					= 9'b001000000,
+						WAIT_CLK				= 9'b010000000,
+						WAIT_LONG			= 9'b100000000;    
 						
-reg 	[7:0] 			state; 
+reg 	[8:0] 			state; 
 
 reg [7:0]	confirm_from_PC;
-reg confirm_from_PC_valid;
+reg 			confirm_from_PC_valid;
 			
 reg 	[0:FRAME_SIZE] frame;
 reg 	[7:0] 			byte_out;
@@ -69,8 +72,10 @@ wire 						tx_ready;
 reg 						transmit_frame;
 wire 						transmit;
 
-integer 					counter_r, counter_s; // liczniki receivera i tranmittera
+reg dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10;
 
+integer 					counter_r, counter_s; // liczniki receivera i tranmittera
+integer 					count_clk;
 wire init	=	1'b0;
 
 RS232_TRANSMITTER transmitter (
@@ -104,8 +109,32 @@ initial begin
 	semafor_out					<= 1'b0;
 	confirm_from_PC			<= 8'h00;
 	confirm_from_PC_valid	<= 1'b0;
+	count_clk					<= 0;
+	dioda1 			<= 1'b0;
+	dioda2 			<= 1'b0;
+	dioda3 			<= 1'b0;
+	dioda4 			<= 1'b0;
+	dioda5 			<= 1'b0;
+	dioda6 			<= 1'b0;
+	dioda7 			<= 1'b0;
+	dioda8 			<= 1'b0;
+	dioda9 			<= 1'b0;
+	dioda10 			<= 1'b0;
+	temp <= 1'b0;
 end
 
+reg temp;
+
+assign diod1 = dioda1;	
+assign diod2 = dioda2;	
+assign diod3 = dioda3;	
+assign diod4 = dioda4;	
+assign diod5 = dioda5;	
+assign diod6 = dioda6;	
+assign diod7 = dioda7;	
+assign diod8 = dioda8;	
+assign diod9 = dioda9;	
+assign diod10 = dioda10;
 
 always @ (posedge clk) begin
 //	if (byte_ready && byte_in == 8'h08) begin
@@ -118,6 +147,12 @@ case(state)
 			fout_valid <= 1'b0;
 		end
 		if (fin_valid) begin
+//			if (temp) begin
+//				dioda6 <= 1'b1;
+//			end
+//			if (!temp) begin
+//				dioda7 <= 1'b1;
+//			end
 			frame <= fin;
 			transmit_frame <= 1'b1;
 			state <= TRANSMITTING;
@@ -197,7 +232,13 @@ case(state)
 //	endFIRST_FRAME
 	
 	TRANSMITTING: begin
+//		if (temp) begin
+//			dioda8 <= 1'b1;
+//		end
 		if (tx_ready) begin
+//			if (temp) begin
+//				dioda9 <= 1'b1;
+//			end
 			if (counter_s == 0) begin
 				byte_out <= FRAME_START;
 				to_escape <= 1'b0;
@@ -229,9 +270,22 @@ case(state)
 		end
 	end
 	
+	WAIT_LONG: begin
+			//dioda3 <= 1'b1;
+			if (count_clk == 20) begin
+				//dioda4 <= 1'b1;
+				state <= RESET;
+				
+			end
+			count_clk <= count_clk + 1;
+		end
+	
 	WAIT_TX: begin
+		//dioda3 <= 1'b1;
+		//transmit_frame <= 1'b1;
 		if (tx_ready) begin
 			state <= RESET;
+			//dioda4 <= 1'b1;
 		end
 	end
 	
@@ -240,10 +294,13 @@ case(state)
 	end
 	
 	WAIT_FOR_CONF: begin // czeka na confirm od peceta
+		dioda1 <= 1'b1;
 		if (byte_ready) begin
+			//transmit_frame <= 1'b0;
+			//dioda2 <= 1'b1;
 			confirm_from_PC <= byte_in;
 			confirm_from_PC_valid <= 1'b1;
-			state <= WAIT_CLK;
+			state <= WAIT_LONG; // zamiast WAIT_CLK
 		end
 	end
 	
@@ -256,7 +313,10 @@ case(state)
 	end
 	
 	RESET: begin
+		//dioda5 <= 1'b1;
+		//temp <= 1'b1;
 		frame 						<= {FRAME_SIZE+1{1'b0}};
+		count_clk 					<= 0;
 		fout_valid 					<= 1'b0;
 		frame_loaded 				<= 1'b0;
 		transmit_frame				<=	1'b0;

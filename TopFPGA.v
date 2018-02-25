@@ -91,7 +91,18 @@ Interface #(
 		.fout							(fout_j),
 		.fout_valid					(fout_j_valid),    
 	   .TX							(TX_JAWNY),
-      .semafor_out				(semafor_j));
+      .semafor_out				(semafor_j),
+		.diod1					(dioda1),
+		.diod2					(dioda2),
+		.diod3					(dioda3),
+		.diod4					(dioda4),
+		.diod5					(dioda5),
+		.diod6					(dioda6),
+		.diod7					(dioda7),
+		.diod8					(dioda8),
+		.diod9					(dioda9),
+		.diod10					(dioda10)	
+		);
 
 Interface #(
 	.DATA_SIZE 			(DATA_SIZE),
@@ -151,17 +162,17 @@ Core # (
 		.Fout_j					(fin_j),
 		.Fout_j_valid			(fin_j_valid),
 		.Fout_t					(fin_t),
-		.Fout_t_valid			(fin_t_valid),
-		.diod1					(dioda1),
-		.diod2					(dioda2),
-		.diod3					(dioda3),
-		.diod4					(dioda4),
-		.diod5					(dioda5),
-		.diod6					(dioda6),
-		.diod7					(dioda7),
-		.diod8					(dioda8),
-		.diod9					(dioda9),
-		.diod10					(dioda10),
+		.Fout_t_valid			(fin_t_valid)
+//		.diod1					(dioda1),
+//		.diod2					(dioda2),
+//		.diod3					(dioda3),
+//		.diod4					(dioda4),
+//		.diod5					(dioda5),
+//		.diod6					(dioda6),
+//		.diod7					(dioda7),
+//		.diod8					(dioda8),
+//		.diod9					(dioda9),
+//		.diod10					(dioda10),
 		
 		);
 	

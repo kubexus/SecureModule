@@ -46,20 +46,21 @@ reg confirm_jawny, confirm_tajny;
 reg [7:0] 	confirm_code;
 
 integer counter;
+integer count_clk;
 
 
 
-
-reg [8:0] state;
-parameter [8:0]	IDLE 							= 9'b000000001,
-						VALID_TYPE					= 9'b000000010,
-						CRC_CHECK 					= 9'b000000100,
-						RESET 						= 9'b000001000,
-						FRAME_PROCESSED 			= 9'b000010000,
-						HARD_RESET					= 9'b000100000,
-						SIGN_ERROR					= 9'b001000000,
-						PASS_FRAME					= 9'b010000000,
-						WAIT_CLK						= 9'b100000000;        
+reg [9:0] state;
+parameter [9:0]	IDLE 							= 10'b0000000001,
+						VALID_TYPE					= 10'b0000000010,
+						CRC_CHECK 					= 10'b0000000100,
+						RESET 						= 10'b0000001000,
+						FRAME_PROCESSED 			= 10'b0000010000,
+						HARD_RESET					= 10'b0000100000,
+						SIGN_ERROR					= 10'b0001000000,
+						PASS_FRAME					= 10'b0010000000,
+						WAIT_CLK						= 10'b0100000000,
+						WAIT_TX						= 10'b1000000000;  
 
 						
 						
@@ -97,6 +98,8 @@ initial begin
 	first 			<= 1'b0;
 	confirm_code 	<= 8'h00;
 	lastFrameNr 	<= {32{1'b0}};
+	
+	
 	dioda1 			<= 1'b0;
 	dioda2 			<= 1'b0;
 	dioda3 			<= 1'b0;
@@ -107,6 +110,7 @@ initial begin
 	dioda8 			<= 1'b0;
 	dioda9 			<= 1'b0;
 	dioda10 			<= 1'b0;
+	count_clk		<= 0;
 end
 
 assign diod1 = dioda1;	
@@ -156,13 +160,14 @@ always @ (posedge clk) begin
 						state <= SIGN_ERROR;
 					end
 					if (!first) begin
-						confirm_jawny <= 1'b1;
-						confirm_tajny <= 1'b1;
+						//confirm_jawny <= 1'b1;
+						//confirm_tajny <= 1'b1;
 						//confirm_code <= OKAY;
 						//state <= SIGN_ERROR;
+						first <= 1'b1;
 						state <= CRC_CHECK;
 						lastFrameNr <= frame[24:55];
-						dioda1 <= 1'b1;
+						//dioda1 <= 1'b1;
 					end
 				end
 			end
@@ -175,6 +180,7 @@ always @ (posedge clk) begin
 				if (first) begin
 					if (frame[24:55] == (lastFrameNr + 1)) begin
 						state <= CRC_CHECK;
+						lastFrameNr <= lastFrameNr + 1;
 					end else begin
 						confirm_code <= ERROR;
 						state <= SIGN_ERROR;
@@ -214,7 +220,7 @@ always @ (posedge clk) begin
 //			end
 //			if (counter == (DATA_SIZE+7)*8-1) begin
 //				if (frame_crc[((DATA_SIZE+7)*8-1)+:32] == 32'h00000000) begin
-					dioda2 <= 1'b1;
+					//dioda2 <= 1'b1;
 					state <= PASS_FRAME;
 //					if (which == JAWNY) begin
 //						fout_t_valid <= 1'b1;
@@ -230,33 +236,48 @@ always @ (posedge clk) begin
 		end
 		
 		PASS_FRAME: begin
+			count_clk <= 0;
 			if (which == JAWNY) begin
-				dioda3 <= 1'b1;
+				//dioda3 <= 1'b1;
 				fout_t_valid <= 1'b1;
 				state <= FRAME_PROCESSED;
 			end
 			if (which == TAJNY) begin
-				dioda4 <= 1'b1;
+				//dioda4 <= 1'b1;
 				fout_j_valid <= 1'b1;
 				state <= FRAME_PROCESSED;
 			end
 		end
 		
+		WAIT_TX: begin
+			if (count_clk == 1000) begin
+//				confirm_jawny <= 1'b1;
+//				confirm_tajny <= 1'b1;
+				//dioda8 <= 1'b1;
+				state <= PASS_FRAME;
+			end
+			count_clk <= count_clk + 1;
+		end
+		
 		FRAME_PROCESSED: begin
+			fout_t_valid <= 1'b0;
+			fout_j_valid <= 1'b0;
 			case(which)
 				TAJNY: begin
-					dioda5 <= 1'b1;
+					//dioda5 <= 1'b1;
 					if (confirm_from_jawny_valid) begin
-						dioda7 <= 1'b1;
+						//dioda7 <= 1'b1;
 						if (confirm_from_jawny == OKAY) begin
-							dioda8 <= 1'b1;
+							//dioda8 <= 1'b1;
 							confirm_code <= OKAY;
 							confirm_tajny <= 1'b1;
 							state <= SIGN_ERROR;
 						end
 						if (confirm_from_jawny == ERROR) begin
-							dioda9 <= 1'b1;
-							state <= PASS_FRAME;
+							//confirm_jawny <= 1'b0;
+							//confirm_tajny <= 1'b0;
+							//dioda9 <= 1'b1;
+							state <= WAIT_TX;
 						end
 						if (confirm_from_jawny == FATAL_ERROR) begin
 							//dioda10 <= 1'b1;
@@ -301,17 +322,18 @@ always @ (posedge clk) begin
 			JAWNY: begin
 			//dioda9 <= 1'b1;
 				confirm_jawny <= 1'b1;
-				state <= WAIT_CLK;		// zmienione z reseta
+				state <= RESET;		// zmienione z reseta
 			end
 			TAJNY: begin
 			//dioda10 <= 1'b1;
 				confirm_tajny <= 1'b1;
-				state <= WAIT_CLK;		// zmienione z reseta
+				state <= RESET;		// zmienione z reseta
 			end	
 		endcase
 		end
 		
 		HARD_RESET: begin
+			count_clk		<= 0;
 			counter 			<= 0;
 			frame 			<= {FRAME_SIZE+1{1'b0}};
 			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
@@ -325,6 +347,7 @@ always @ (posedge clk) begin
 		end
 		
 		RESET: begin
+			count_clk		<= 0;
 			confirm_jawny	<=	1'b0;
 			confirm_tajny	<=	1'b0;
 			confirm_code	<= 8'h00;
