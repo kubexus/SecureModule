@@ -14,8 +14,8 @@ module Interface (
 	output reg 						fout_valid,
 	output reg 						semafor_out,
 	
-	output reg 	[7:0]				confirm_from_PC,
-	output reg 						confirm_from_PC_valid,
+	output wire 	[7:0]				conf_from_PC,
+	output wire 						conf_from_PC_valid,
 	
 	output reg TX
 	
@@ -43,15 +43,19 @@ parameter [7:0] 	OKAY					=	8'h05;
 parameter [7:0]	ERROR 				=	8'h04;
 parameter [7:0]	FATAL_ERROR			= 	8'h08;
 
-parameter [6:0]	IDLE 					= 7'b0000001,
-						RECEIVING 			= 7'b0000010,
-						TRANSMITTING 		= 7'b0000100,
-						WAIT_FOR_CONF 		= 7'b0001000,
-						WAIT			 		= 7'b0010000,
-						CONFIRM				= 7'b0100000,
-						RESET					= 7'b1000000;
+parameter [7:0]	IDLE 					= 8'b00000001,
+						RECEIVING 			= 8'b00000010,
+						TRANSMITTING 		= 8'b00000100,
+						WAIT_FOR_CONF 		= 8'b00001000,
+						WAIT_TX			 	= 8'b00010000,
+						CONFIRM				= 8'b00100000,
+						RESET					= 8'b01000000,
+						WAIT_CLK				= 8'b10000000;
 						
-reg 	[6:0] 			state; 
+reg 	[7:0] 			state; 
+
+reg [7:0]	confirm_from_PC;
+reg confirm_from_PC_valid;
 			
 reg 	[0:FRAME_SIZE] frame;
 reg 	[7:0] 			byte_out;
@@ -98,16 +102,16 @@ initial begin
 	to_escape 					<= 1'b0;
 	state							<=	IDLE;
 	semafor_out					<= 1'b0;
-	confirm_from_PC			<= 1'b0;
+	confirm_from_PC			<= 8'h00;
 	confirm_from_PC_valid	<= 1'b0;
 end
 
 
 always @ (posedge clk) begin
-	if (byte_ready && byte_in == 8'h08) begin
-		state <= RESET;
-		semafor_out			<= 1'b0;
-	end
+//	if (byte_ready && byte_in == 8'h08) begin
+//		state 				<= RESET;
+//		semafor_out			<= 1'b0;
+//	end
 case(state)
 	IDLE: begin
 		if (fout_valid) begin
@@ -137,14 +141,14 @@ case(state)
 			end
 			if (!to_escape) begin
 				if (byte_in == FRAME_END) begin
-					if (counter_r == DATA_SIZE + 11 - 1) begin // ramka wychodzi z interfejsu
+					if (counter_r == DATA_SIZE + 11) begin // ramka wychodzi z interfejsu
 						fout_valid <= 1'b1;
-						//frame_loaded <= 1'b1;
+						frame_loaded <= 1'b1;
 						state <= CONFIRM;
 					end else begin			// nie odebrano calej ramki, counter za maly
 						transmit_frame <= 1'b1;
-						byte_out <= ERROR;
-						state <= WAIT;
+						byte_out <= 8'h66;
+						state <= WAIT_TX;
 					end
 				end
 				if (byte_in == ESC_VAL) begin
@@ -159,7 +163,7 @@ case(state)
 		if (counter_r > DATA_SIZE + 13) begin // counter przekrozyl ramke, nie napotano frame end
 			transmit_frame <= 1'b1;
 			byte_out <= ERROR;
-			state <= WAIT;
+			state <= WAIT_TX;
 		end
 	end
 	
@@ -179,7 +183,7 @@ case(state)
 //					frame_loaded <= 1'b0;
 //					state <= CONFIRM;
 //				end else begin
-//					transmit_frame <= 1'b1;
+//					transmit_frame <= 1'bcounter_r == DATA_SIZE + 111;
 //					byte_out <= ERR_NR;
 //					state <= CONFIRM;
 //					semafor_out <= 1'b0;
@@ -190,7 +194,7 @@ case(state)
 //					lastFrameNr <= {32{1'b0}};
 //				end
 //			end
-//	end
+//	endFIRST_FRAME
 	
 	TRANSMITTING: begin
 		if (tx_ready) begin
@@ -225,24 +229,29 @@ case(state)
 		end
 	end
 	
-	WAIT: begin
+	WAIT_TX: begin
 		if (tx_ready) begin
 			state <= RESET;
 		end
+	end
+	
+	WAIT_CLK: begin
+		state <= RESET;
 	end
 	
 	WAIT_FOR_CONF: begin // czeka na confirm od peceta
 		if (byte_ready) begin
 			confirm_from_PC <= byte_in;
 			confirm_from_PC_valid <= 1'b1;
+			state <= WAIT_CLK;
 		end
 	end
 	
 	CONFIRM: begin
 		if (confirm) begin
-			transmit_frame <= 1'b1;
 			byte_out <= conf_code;
-			state <= WAIT;
+			transmit_frame <= 1'b1;
+			state <= WAIT_TX;
 		end
 	end
 	
@@ -251,17 +260,20 @@ case(state)
 		fout_valid 					<= 1'b0;
 		frame_loaded 				<= 1'b0;
 		transmit_frame				<=	1'b0;
-		byte_out 					<= 8'h0f;
+		byte_out 					<= 8'h00;
 		counter_r 					<= 0;
 		counter_s					<=	0;
 		to_escape 					<= 1'b0;
 		state							<=	IDLE;
-		confirm_from_PC			<= 1'b0;
+		confirm_from_PC			<= 8'h00;
 		confirm_from_PC_valid	<= 1'b0;
 	end
 	
 endcase	
 end
+
+assign conf_from_PC = confirm_from_PC;
+assign conf_from_PC_valid = confirm_from_PC_valid;
 
 assign fout = frame;
 assign transmit = (transmit_frame) ? 1'b1:1'b0;

@@ -6,7 +6,9 @@ module TopFPGA (
 	input wire RX_TAJNY,
 	
 	output wire TX_JAWNY,
-	output wire TX_TAJNY
+	output wire TX_TAJNY,
+	
+	output wire dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10
 	
 );
 
@@ -41,6 +43,11 @@ wire [0:FRAME_SIZE] fin_j, fin_t;
 wire fin_j_valid, fin_t_valid;
 
 wire semafor_j, semafor_t;
+
+wire [7:0] confirm_code, confirm_from_jawny, confirm_from_tajny;
+wire confirm_from_PC_valid, confirm, confirm_from_tajny_valid, confirm_from_jawny_valid, confirm_jawny, confirm_tajny;
+
+
 
 //wire aes_reset, aes_start, aes_take;
 
@@ -79,8 +86,8 @@ Interface #(
 		.confirm						(confirm_jawny),
 		.fin_valid					(fin_j_valid),
 		.conf_code					(confirm_code),
-		.confirm_from_PC			(confirm_from_jawny),
-		.confirm_from_PC_valid	(confirm_from_jawny_valid),
+		.conf_from_PC			(confirm_from_jawny),
+		.conf_from_PC_valid	(confirm_from_jawny_valid),
 		.fout							(fout_j),
 		.fout_valid					(fout_j_valid),    
 	   .TX							(TX_JAWNY),
@@ -107,8 +114,8 @@ Interface #(
 		.fin_valid					(fin_t_valid),
 		.confirm						(confirm_tajny),
 		.conf_code					(confirm_code),
-		.confirm_from_PC			(confirm_from_tajny),
-		.confirm_from_PC_valid	(confirm_from_tajny_valid),
+		.conf_from_PC				(confirm_from_tajny),
+		.conf_from_PC_valid		(confirm_from_tajny_valid),
 		.fout							(fout_t),
 		.fout_valid					(fout_t_valid),
 	   .TX							(TX_TAJNY),
@@ -138,13 +145,25 @@ Core # (
 		.confirm_from_jawny			(confirm_from_jawny),
 		.confirm_from_jawny_valid 	(confirm_from_jawny_valid),
 		
-		.confirm_jawny			(confirm_jawny),
-		.confirm_tajny			(confirm_tajny),
-		.confirm_code			(confirm_code),
+		.conf_jawny			(confirm_jawny),
+		.conf_tajny			(confirm_tajny),
+		.conf_code			(confirm_code),
 		.Fout_j					(fin_j),
 		.Fout_j_valid			(fin_j_valid),
 		.Fout_t					(fin_t),
-		.Fout_t_valid			(fin_t_valid));
+		.Fout_t_valid			(fin_t_valid),
+		.diod1					(dioda1),
+		.diod2					(dioda2),
+		.diod3					(dioda3),
+		.diod4					(dioda4),
+		.diod5					(dioda5),
+		.diod6					(dioda6),
+		.diod7					(dioda7),
+		.diod8					(dioda8),
+		.diod9					(dioda9),
+		.diod10					(dioda10),
+		
+		);
 	
 
 endmodule
