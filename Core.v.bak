@@ -1,0 +1,30 @@
+module Core (
+	input wire clk,
+	input wire [(DATA_SIZE+10)*8-1:0] Fin_j,
+	input wire Fin_j_valid,
+	input wire [(DATA_SIZE+10)*8-1:0] Fin_t,
+	input wire Fin_t_valid,
+	
+	output reg [(DATA_SIZE+10)*8-1:0] Fout_j,
+	output reg Fout_j_valid,
+	output reg [(DATA_SIZE+10)*8-1:0] Fout_t,
+	output reg Fout_t_valid
+);
+
+parameter [10:0]	DATA_SIZE			=	11'h100;
+
+always @ (posedge clk) begin
+	if (Fin_j_valid) begin
+		Fout_t <= Fin_j;
+		Fout_t_valid <= 1'b1;
+	end
+end
+
+always @ (posedge clk) begin
+	if (Fin_t_valid) begin
+		Fout_j <= Fin_t;
+		Fout_j_valid <= 1'b1;
+	end
+end
+
+endmodule

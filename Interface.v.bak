@@ -1,0 +1,86 @@
+module Interface (
+	input wire clk,
+	input wire RX,
+	input wire init,
+	
+	output reg TX 
+);
+
+parameter FRAME_SIZE = 16'h8c; // in bytes (140)
+parameter FRAME_START = 8'b00100000; // spacja
+
+reg [7:0] byte_in, byte_out;
+reg receive_frame;
+wire data_ready;
+wire load;
+wire start_transmit;
+
+reg [FRAME_SIZE*8-1:0] frame;
+reg [8:0] counter; 
+
+RS232_TRANSMITTER transmitter (
+	.CLK	(clk),
+	.INIT	(init),
+	.DRL	(start_transmit),
+	.LOAD	(load),
+	.DIN	(byte_out),
+	.TX	(TX)
+);
+
+RS232_RECEIVER receiver (
+	.CLK		(clk),
+	.INIT		(init),
+	.RX		(RX),
+	.STORE	(data_ready),
+	.DOUT		(byte_in)
+);
+
+initial begin
+	byte_in <= 8'h00;
+	byte_out <= 8'h00;
+	TX <= 1'b0;
+	receive_frame <= 1'b0;
+	frame <= {FRAME_SIZE{8'b0}};
+end
+
+task reset;
+begin
+	byte_in <= 8'h00;
+	byte_out <= 8'h00;
+	TX <= 1'b0;
+	frame <= {FRAME_SIZE{8'b0}};
+endtask
+
+always @(posedge clk) begin
+	if (data_ready && byte_in == FRAME_START) begin
+		receive_frame <= 1'b1;
+		reset();
+	end
+end
+
+
+always @(posedge clk) begin
+	if (receive_frame) begin
+	
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,18 @@
+module TopFPGA (
+	input wire clk,
+	
+	input wire RX_JAWNY,
+	input wire RX_TAJNY,
+	
+	output reg TX_JAWNY,
+	output reg TX_TAJNY
+);
+
+reg init;
+
+
+
+
+
+assign init = 1'b0;
+
