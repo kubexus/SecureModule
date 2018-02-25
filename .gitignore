@@ -13,7 +13,6 @@ RS232_INTERFACE_PKG.vhd
 RS232_MEMORY.vhd
 RS232_STANDARD_INTERFACE.vhd
 SecureModule.dpf
-SecureModule.qpf
 SecureModule.qsf
 TopFPGA.v.bak
 db/
