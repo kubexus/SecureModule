@@ -56,7 +56,7 @@ wire confirm_from_PC_valid, confirm, confirm_from_tajny_valid, confirm_from_jawn
 //wire [1:0] select_key;
 
 //encrypter AES (
-//	.clock				(clk),
+//	.clock				(clk),confirm_code
 //	.reset				(aes_reset),
 //	.start				(aes_start),
 //	.nonce				(aes_nonce),

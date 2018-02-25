@@ -6,11 +6,11 @@ module Core (
 	input wire [0:FRAME_SIZE] 	Fin_t,
 	input wire 						Fin_t_valid,
 	
-	input wire confirm_from_tajny,
+	input wire [7:0]				confirm_from_tajny,
 	input wire confirm_from_tajny_valid,
 	
-	input wire confirm_from_jawny,
-	input wire confirm_from_jawny_valid,
+	input wire [7:0]				confirm_from_jawny,
+	input wire 						confirm_from_jawny_valid,
 	
 	output wire [0:FRAME_SIZE] Fout_j,
 	output wire 					Fout_j_valid,
@@ -247,19 +247,25 @@ always @ (posedge clk) begin
 				TAJNY: begin
 					dioda5 <= 1'b1;
 					if (confirm_from_jawny_valid) begin
-						//dioda7 <= 1'b1;
+						dioda7 <= 1'b1;
 						if (confirm_from_jawny == OKAY) begin
+							dioda8 <= 1'b1;
 							confirm_code <= OKAY;
 							confirm_tajny <= 1'b1;
 							state <= SIGN_ERROR;
 						end
 						if (confirm_from_jawny == ERROR) begin
+							dioda9 <= 1'b1;
 							state <= PASS_FRAME;
 						end
 						if (confirm_from_jawny == FATAL_ERROR) begin
+							//dioda10 <= 1'b1;
 							confirm_code <= FATAL_ERROR;
 							confirm_tajny <= 1'b1;
 							state <= HARD_RESET;
+						end
+						if (confirm_from_jawny != OKAY && confirm_from_jawny != ERROR && confirm_from_jawny != FATAL_ERROR) begin
+							dioda10 <= 1'b1;
 						end
 					end
 				end
@@ -293,12 +299,12 @@ always @ (posedge clk) begin
 		SIGN_ERROR: begin
 		case (which)
 			JAWNY: begin
-			dioda9 <= 1'b1;
+			//dioda9 <= 1'b1;
 				confirm_jawny <= 1'b1;
 				state <= WAIT_CLK;		// zmienione z reseta
 			end
 			TAJNY: begin
-			dioda10 <= 1'b1;
+			//dioda10 <= 1'b1;
 				confirm_tajny <= 1'b1;
 				state <= WAIT_CLK;		// zmienione z reseta
 			end	
