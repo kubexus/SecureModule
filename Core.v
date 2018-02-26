@@ -25,10 +25,12 @@ module Core (
 );
 
 
-parameter DATA_SIZE 		= 64;
-parameter PREAMBLE_SIZE = 7;
-parameter CRC_SIZE 		= 4;
-parameter FRAME_SIZE 	= (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1;
+parameter NONCE_SIZE			= 12;
+parameter DATA_SIZE 			= 64;
+parameter PREAMBLE_SIZE 	= 7;
+parameter CRC_SIZE 			= 4;
+
+parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
 
 parameter [32:0] CRC_POLY = 33'h104c11db7;
 
@@ -96,29 +98,29 @@ initial begin
 	lastFrameNr 	<= {32{1'b0}};
 	fat_err			<=	1'b0;
 	
-	dioda1 			<= 1'b0;
-	dioda2 			<= 1'b0;
-	dioda3 			<= 1'b0;
-	dioda4 			<= 1'b0;
-	dioda5 			<= 1'b0;
-	dioda6 			<= 1'b0;
-	dioda7 			<= 1'b0;
-	dioda8 			<= 1'b0;
-	dioda9 			<= 1'b0;
-	dioda10 			<= 1'b0;
+//	dioda1 			<= 1'b0;
+//	dioda2 			<= 1'b0;
+//	dioda3 			<= 1'b0;
+//	dioda4 			<= 1'b0;
+//	dioda5 			<= 1'b0;
+//	dioda6 			<= 1'b0;
+//	dioda7 			<= 1'b0;
+//	dioda8 			<= 1'b0;
+//	dioda9 			<= 1'b0;
+//	dioda10 			<= 1'b0;
 	count_clk		<= 0;
 end
 
-assign diod1 = dioda1;	
-assign diod2 = dioda2;	
-assign diod3 = dioda3;	
-assign diod4 = dioda4;	
-assign diod5 = dioda5;	
-assign diod6 = dioda6;	
-assign diod7 = dioda7;	
-assign diod8 = dioda8;	
-assign diod9 = dioda9;	
-assign diod10 = dioda10;						
+//assign diod1 = dioda1;	
+//assign diod2 = dioda2;	
+//assign diod3 = dioda3;	
+//assign diod4 = dioda4;	
+//assign diod5 = dioda5;	
+//assign diod6 = dioda6;	
+//assign diod7 = dioda7;	
+//assign diod8 = dioda8;	
+//assign diod9 = dioda9;	
+//assign diod10 = dioda10;						
 						
 always @ (posedge clk) begin
 	case (state)
@@ -203,6 +205,7 @@ always @ (posedge clk) begin
 					if (frame[24:55] == (lastFrameNr + 1)) begin
 						state <= CRC_CHECK;
 						lastFrameNr <= {32{1'b0}};
+						first <= 1'b0;
 					end
 				end
 			end
@@ -216,16 +219,16 @@ always @ (posedge clk) begin
 //			end
 //			if (counter == (DATA_SIZE+7)*8-1) begin
 //				if (frame_crc[((DATA_SIZE+7)*8-1)+:32] == 32'h00000000) begin
-					//dioda2 <= 1'b1;
-					state <= PASS_FRAME;
-//					if (which == JAWNY) begin
-//						fout_t_valid <= 1'b1;
-//						state <= FRAME_PROCESSED;
-//					end
-//					if (which == TAJNY) begin
-//						fout_j_valid <= 1'b1;
-//						state <= FRAME_PROCESSED;
-//					end
+//					//dioda2 <= 1'b1;
+//					state <= PASS_FRAME;
+					if (which == JAWNY) begin
+						fout_t_valid <= 1'b1;
+						state <= FRAME_PROCESSED;
+					end
+					if (which == TAJNY) begin
+						fout_j_valid <= 1'b1;
+						state <= FRAME_PROCESSED;
+					end
 //				end
 //			end
 //			counter <= counter + 1;
@@ -234,12 +237,10 @@ always @ (posedge clk) begin
 		PASS_FRAME: begin
 			count_clk <= 0;
 			if (which == JAWNY) begin
-				//dioda3 <= 1'b1;
 				fout_t_valid <= 1'b1;
 				state <= FRAME_PROCESSED;
 			end
 			if (which == TAJNY) begin
-				//dioda4 <= 1'b1;
 				fout_j_valid <= 1'b1;
 				state <= FRAME_PROCESSED;
 			end
@@ -261,23 +262,16 @@ always @ (posedge clk) begin
 			fout_j_valid <= 1'b0;
 			case(which)
 				TAJNY: begin
-					//dioda5 <= 1'b1;
 					if (confirm_from_jawny_valid) begin
-						//dioda7 <= 1'b1;
 						if (confirm_from_jawny == OKAY) begin
-							//dioda8 <= 1'b1;
 							confirm_code <= OKAY;
 							confirm_tajny <= 1'b1;
 							state <= SIGN_ERROR;
 						end
 						if (confirm_from_jawny == ERROR) begin
-							//confirm_jawny <= 1'b0;
-							//confirm_tajny <= 1'b0;
-							//dioda9 <= 1'b1;
 							state <= WAIT_TX;
 						end
 						if (confirm_from_jawny == FATAL_ERROR) begin
-							//dioda10 <= 1'b1;
 							confirm_code <= FATAL_ERROR;
 							fat_err <= 1'b1;
 							confirm_tajny <= 1'b1;
@@ -290,9 +284,7 @@ always @ (posedge clk) begin
 				end
 				
 				JAWNY: begin
-					//dioda6 <= 1'b1;
 					if (confirm_from_tajny_valid) begin
-					//dioda8 <= 1'b1;
 						if (confirm_from_tajny == OKAY) begin
 							confirm_code <= OKAY;
 							confirm_jawny <= 1'b1;

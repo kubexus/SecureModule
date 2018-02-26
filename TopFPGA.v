@@ -12,11 +12,12 @@ module TopFPGA (
 	
 );
 
+parameter NONCE_SIZE			= 12;
 parameter DATA_SIZE 			= 64;
 parameter PREAMBLE_SIZE 	= 7;
 parameter CRC_SIZE 			= 4;
 
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1;
+parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
 
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h10;
@@ -65,8 +66,22 @@ wire confirm_from_PC_valid, confirm, confirm_from_tajny_valid, confirm_from_jawn
 //	.ciphertext			(aes_stream)
 //);
 
+
+
+CRC_CHECK crc (
+
+	.data_in			(din_crc)	,
+   .crc_en			(crc_en)		,
+   .crc_out			(dout_crc)	,
+   .rst   			(res_crc)	,
+   .clk    			(clk)
+
+);
+
+
 Interface #(
 	.DATA_SIZE 			(DATA_SIZE),
+	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
 	.FRAME_START      (FRAME_START),
@@ -106,6 +121,7 @@ Interface #(
 
 Interface #(
 	.DATA_SIZE 			(DATA_SIZE),
+	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
 	.FRAME_START      (FRAME_START),
@@ -134,6 +150,7 @@ Interface #(
 	
 Core # (
 	.DATA_SIZE 			(DATA_SIZE),
+	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
 	.FRAME_START      (FRAME_START),

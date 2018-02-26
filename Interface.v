@@ -23,10 +23,14 @@ module Interface (
 	
 );
 
+parameter NONCE_SIZE			= 12;
 parameter DATA_SIZE 			= 64;
 parameter PREAMBLE_SIZE 	= 7;
 parameter CRC_SIZE 			= 4;
-parameter FRAME_SIZE 		= (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE)*8-1; // in bits
+
+parameter INFO = PREAMBLE_SIZE + CRC_SIZE + NONCE_SIZE;
+
+parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
 
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -171,7 +175,7 @@ case(state)
 			end
 			if (!to_escape) begin
 				if (byte_in == FRAME_END) begin
-					if (counter_r == DATA_SIZE + 11) begin // ramka wychodzi z interfejsu
+					if (counter_r == DATA_SIZE + INFO) begin // ramka wychodzi z interfejsu
 						fout_valid <= 1'b1;
 						frame_loaded <= 1'b1;
 						state <= CONFIRM;
@@ -190,7 +194,7 @@ case(state)
 				end
 			end
 		end
-		if (counter_r > DATA_SIZE + 13) begin // counter przekrozyl ramke, nie napotano frame end
+		if (counter_r > DATA_SIZE + INFO + 2) begin // counter przekrozyl ramke, nie napotano frame end
 			transmit_frame <= 1'b1;
 			byte_out <= ERROR;
 			state <= WAIT_TX;
@@ -244,7 +248,7 @@ case(state)
 				to_escape <= 1'b0;
 				counter_s <= counter_s + 1;
 			end
-			if (counter_s > 1 && counter_s <= DATA_SIZE+11) begin
+			if (counter_s > 1 && counter_s <= DATA_SIZE+INFO) begin
 				if (to_escape) begin
 					byte_out <= (frame[(counter_s-1)*8+:8] ^ ESC_XOR);
 					to_escape <= 1'b0;
@@ -259,13 +263,13 @@ case(state)
 					end
 				end
 			end
-			if (counter_s == DATA_SIZE+12) begin
+			if (counter_s == DATA_SIZE+INFO+1) begin
 				byte_out <= FRAME_END;
 				counter_s <= counter_s + 1;
 				transmit_frame <= 1'b0;	
 			end
 		end
-		if (counter_s == DATA_SIZE+13) begin
+		if (counter_s == DATA_SIZE+INFO+2) begin
 			state <= WAIT_FOR_CONF;
 		end
 	end
@@ -283,6 +287,9 @@ case(state)
 	
 	WAIT_TX: begin
 		if (tx_ready) begin
+			if (frame[0:7] == LAST_FRAME) begin
+				semafor_out <= 1'b0;
+			end
 			state <= RESET;
 		end
 	end
