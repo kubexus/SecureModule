@@ -4,33 +4,37 @@ module Interface (
 	input wire 	RX,
 	input wire 	semafor_in,
 	
-	input wire 	[0:FRAME_SIZE] fin,
-	input wire 						fin_valid,
+	input wire 	[0:FRAME_SIZE*8-1] fin,
+	input wire 								fin_valid,
 	
 	input wire 						confirm,
 	input wire 	[7:0] 			conf_code,
 	
-	output wire [0:FRAME_SIZE] fout,
+	output wire [0:FRAME_SIZE*8-1] fout,
 	output reg 						fout_valid,
 	output reg 						semafor_out,
 	
 	output wire 	[7:0]				conf_from_PC,
 	output wire 						conf_from_PC_valid,
-	
-	output reg TX,
-	
-	output wire diod1, diod2, diod3, diod4, diod5, diod6, diod7, diod8, diod9, diod10
+	output wire	diod1, diod2, diod3, diod4, diod5, diod6,
+	output reg TX
 	
 );
 
-parameter NONCE_SIZE			= 12;
-parameter DATA_SIZE 			= 64;
-parameter PREAMBLE_SIZE 	= 7;
-parameter CRC_SIZE 			= 4;
+assign diod1 = dioda1;
+assign diod2 = dioda2;
+assign diod3 = dioda3;
+//assign diod1 = dioda1;
 
-parameter INFO = PREAMBLE_SIZE + CRC_SIZE + NONCE_SIZE;
+parameter NONCE_SIZE			= 0;
+parameter DATA_SIZE 			= 0;
+parameter PREAMBLE_SIZE 	= 0;
+parameter CRC_SIZE 			= 0;
 
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
+parameter INFO					=	PREAMBLE_SIZE + CRC_SIZE;
+parameter FRAME_SIZE 		= 	PREAMBLE_SIZE + NONCE_SIZE + DATA_SIZE + CRC_SIZE;
+//parameter FRAME_SIZE_NONCE = 	0;	
+
 
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -65,7 +69,7 @@ reg 	[9:0] 			state;
 reg [7:0]	confirm_from_PC;
 reg 			confirm_from_PC_valid;
 			
-reg 	[0:FRAME_SIZE] frame;
+reg 	[0:FRAME_SIZE*8-1] frame;
 reg 	[7:0] 			byte_out;
 reg						frame_loaded;
 
@@ -77,11 +81,11 @@ wire 						tx_ready;
 reg 						transmit_frame;
 wire 						transmit;
 
-reg dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10;
-
 integer 					counter_r, counter_s; // liczniki receivera i tranmittera
 integer 					count_clk;
 wire init	=	1'b0;
+
+reg dioda1, dioda2, dioda3, dioda4, dioda5, dioda6;
 
 RS232_TRANSMITTER transmitter (
 	.CLK	(clk),
@@ -102,7 +106,7 @@ RS232_RECEIVER receiver (
 
 
 initial begin
-	frame 						<= {FRAME_SIZE+1{1'b0}};
+	frame 						<= {(FRAME_SIZE*8-1)+1{1'b0}};
 	fout_valid 					<= 1'b0;
 	frame_loaded 				<= 1'b0;
 	transmit_frame				<=	1'b0;
@@ -115,31 +119,16 @@ initial begin
 	confirm_from_PC			<= 8'h00;
 	confirm_from_PC_valid	<= 1'b0;
 	count_clk					<= 0;
-	dioda1 			<= 1'b0;
-	dioda2 			<= 1'b0;
-	dioda3 			<= 1'b0;
-	dioda4 			<= 1'b0;
-	dioda5 			<= 1'b0;
-	dioda6 			<= 1'b0;
-	dioda7 			<= 1'b0;
-	dioda8 			<= 1'b0;
-	dioda9 			<= 1'b0;
-	dioda10 			<= 1'b0;
 	temp <= 1'b0;
+	dioda1 <= 1'b0;
+	dioda2 <= 1'b0;
+	dioda3 <= 1'b0;
+	dioda4 <= 1'b0;
+	dioda5 <= 1'b0;
+	dioda6 <= 1'b0;
 end
 
 reg temp;
-
-assign diod1 = dioda1;	
-assign diod2 = dioda2;	
-assign diod3 = dioda3;	
-assign diod4 = dioda4;	
-assign diod5 = dioda5;	
-assign diod6 = dioda6;	
-assign diod7 = dioda7;	
-assign diod8 = dioda8;	
-assign diod9 = dioda9;	
-assign diod10 = dioda10;
 
 always @ (posedge clk) begin
 
@@ -158,9 +147,9 @@ case(state)
 				state <= RECEIVING;
 				semafor_out <= 1'b1;
 			end
-			//if (byte_in == FATAL_ERROR) begin
-			//	state <= HARD_RESET;
-			//end
+			if (byte_in == FATAL_ERROR) begin
+				state <= HARD_RESET;
+			end
 		end
 	end
 	RECEIVING: begin
@@ -175,7 +164,7 @@ case(state)
 			end
 			if (!to_escape) begin
 				if (byte_in == FRAME_END) begin
-					if (counter_r == DATA_SIZE + INFO) begin // ramka wychodzi z interfejsu
+					if (counter_r == FRAME_SIZE) begin // ramka wychodzi z interfejsu
 						fout_valid <= 1'b1;
 						frame_loaded <= 1'b1;
 						state <= CONFIRM;
@@ -194,7 +183,7 @@ case(state)
 				end
 			end
 		end
-		if (counter_r > DATA_SIZE + INFO + 2) begin // counter przekrozyl ramke, nie napotano frame end
+		if (counter_r > FRAME_SIZE + 2) begin // counter przekrozyl ramke, nie napotano frame end
 			transmit_frame <= 1'b1;
 			byte_out <= ERROR;
 			state <= WAIT_TX;
@@ -231,13 +220,8 @@ case(state)
 //	endFIRST_FRAME
 	
 	TRANSMITTING: begin
-//		if (temp) begin
-//			dioda8 <= 1'b1;
-//		end
 		if (tx_ready) begin
-//			if (temp) begin
-//				dioda9 <= 1'b1;
-//			end
+
 			if (counter_s == 0) begin
 				byte_out <= FRAME_START;
 				to_escape <= 1'b0;
@@ -248,7 +232,7 @@ case(state)
 				to_escape <= 1'b0;
 				counter_s <= counter_s + 1;
 			end
-			if (counter_s > 1 && counter_s <= DATA_SIZE+INFO) begin
+			if (counter_s > 1 && counter_s <= FRAME_SIZE) begin
 				if (to_escape) begin
 					byte_out <= (frame[(counter_s-1)*8+:8] ^ ESC_XOR);
 					to_escape <= 1'b0;
@@ -263,34 +247,35 @@ case(state)
 					end
 				end
 			end
-			if (counter_s == DATA_SIZE+INFO+1) begin
+			if (counter_s == FRAME_SIZE+1) begin
 				byte_out <= FRAME_END;
 				counter_s <= counter_s + 1;
 				transmit_frame <= 1'b0;	
 			end
 		end
-		if (counter_s == DATA_SIZE+INFO+2) begin
+		if (counter_s == FRAME_SIZE+2) begin
 			state <= WAIT_FOR_CONF;
 		end
 	end
 	
 	WAIT_LONG: begin
 			if (count_clk == 20) begin
-				//if (confirm_from_PC == FATAL_ERROR) begin
-				//	state <= HARD_RESET;
-				//end else begin
+				if (confirm_from_PC == FATAL_ERROR) begin
+					state <= HARD_RESET;
+				end else begin
 					state <= RESET;
-				//end
+				end
 			end
 			count_clk <= count_clk + 1;
 		end
 	
 	WAIT_TX: begin
 		if (tx_ready) begin
-			if (frame[0:7] == LAST_FRAME) begin
-				semafor_out <= 1'b0;
+			if (byte_out == OKAY ^ 8'h10) begin
+				state <= HARD_RESET;
+			end else begin
+				state <= RESET;
 			end
-			state <= RESET;
 		end
 	end
 	
@@ -299,24 +284,28 @@ case(state)
 	end
 	
 	WAIT_FOR_CONF: begin // czeka na confirm od peceta
-		dioda1 <= 1'b1;
 		if (byte_ready) begin
-				confirm_from_PC <= byte_in;
-				confirm_from_PC_valid <= 1'b1;
-				state <= WAIT_LONG; // zamiast WAIT_CLK
+			dioda1 <= 1'b1;
+			if (byte_in == OKAY) begin
+				dioda2 <= 1'b1;
+			end
+			confirm_from_PC <= byte_in;
+			confirm_from_PC_valid <= 1'b1;
+			state <= WAIT_LONG; // zamiast WAIT_CLK
 		end
 	end
 	
 	CONFIRM: begin
 		if (confirm) begin
-			byte_out <= conf_code;
+			dioda3 <= 1'b1;
+			byte_out <= conf_code; // albo OKAY
 			transmit_frame <= 1'b1;
 			state <= WAIT_TX;
 		end
 	end
 	
 	HARD_RESET: begin
-		frame 						<= {FRAME_SIZE+1{1'b0}};
+		frame 						<= {(FRAME_SIZE*8-1)+1{1'b0}};
 		fout_valid 					<= 1'b0;
 		frame_loaded 				<= 1'b0;
 		transmit_frame				<=	1'b0;
@@ -332,7 +321,7 @@ case(state)
 	end
 	
 	RESET: begin
-		frame 						<= {FRAME_SIZE+1{1'b0}};
+		frame 						<= {(FRAME_SIZE*8-1)+1{1'b0}};
 		count_clk 					<= 0;
 		fout_valid 					<= 1'b0;
 		frame_loaded 				<= 1'b0;

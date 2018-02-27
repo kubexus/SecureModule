@@ -8,16 +8,19 @@ module TopFPGA (
 	output wire TX_JAWNY,
 	output wire TX_TAJNY,
 	
-	output wire dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10
+	output wire dioda1,dioda2,dioda3,dioda4,dioda5,dioda6
 	
 );
+
 
 parameter NONCE_SIZE			= 12;
 parameter DATA_SIZE 			= 64;
 parameter PREAMBLE_SIZE 	= 7;
 parameter CRC_SIZE 			= 4;
 
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
+parameter INFO					=	PREAMBLE_SIZE + CRC_SIZE;
+parameter FRAME_SIZE 		= 	PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE;
+parameter FRAME_SIZE_NONCE = 	PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE;
 
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h10;
@@ -37,10 +40,14 @@ parameter [7:0]	ERROR 				=	8'h04;
 parameter [7:0]	FATAL_ERROR			= 	8'h08;
 
 
-wire [0:FRAME_SIZE] fout_j, fout_t;
+wire [0:FRAME_SIZE_NONCE*8-1] fout_j;
+wire [0:FRAME_SIZE*8-1] fout_t;
+
 wire fout_j_valid, fout_t_valid;
 
-wire [0:FRAME_SIZE] fin_j, fin_t;
+wire [0:FRAME_SIZE_NONCE*8-1] fin_j;
+wire [0:FRAME_SIZE*8-1] fin_t;
+
 wire fin_j_valid, fin_t_valid;
 
 wire semafor_j, semafor_t;
@@ -50,37 +57,29 @@ wire confirm_from_PC_valid, confirm, confirm_from_tajny_valid, confirm_from_jawn
 
 
 
-//wire aes_reset, aes_start, aes_take;
-
-//wire [95:0] aes_nonce;
-//wire [127:0] aes_stream;
-//wire [1:0] select_key;
-
-//encrypter AES (
-//	.clock				(clk),confirm_code
-//	.reset				(aes_reset),
-//	.start				(aes_start),
-//	.nonce				(aes_nonce),
-//	.sel					(select_key),
-//	.take					(aes_take),
-//	.ciphertext			(aes_stream)
-//);
-
-
-
-CRC_CHECK crc (
-
-	.data_in			(din_crc)	,
-   .crc_en			(crc_en)		,
-   .crc_out			(dout_crc)	,
-   .rst   			(res_crc)	,
-   .clk    			(clk)
+encrypter aes ( 
+	.clock		(clk),     
+   .reset      (res_aes),       
+   .start      (start_aes),      
+   .stop       (stop_aes),         
+   .nonce      (nonce_aes),       
+   .new_nonce 	(new_nonce),       
+   .key       	(key_in),       
+   .take      	(take_aes),      
+   .ciphertext	(ciphertext_aes)
 
 );
 
+crc600 crc_check_600 (
+	.clk		(clk),
+	.rst		(rst_600),
+	.crc_out	(crc_out600),
+	.crc_en	(crc_en600),
+	.data_in	(data_in600)
+);
 
 Interface #(
-	.DATA_SIZE 			(DATA_SIZE),
+	.DATA_SIZE 			(DATA_SIZE ),
 	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
@@ -98,6 +97,8 @@ Interface #(
 		.RX							(RX_JAWNY),
 		.semafor_in					(semafor_t),
 		.fin							(fin_j),
+		.diod1						(dioda5),
+		.diod2						(dioda6),
 		.confirm						(confirm_jawny),
 		.fin_valid					(fin_j_valid),
 		.conf_code					(confirm_code),
@@ -106,24 +107,17 @@ Interface #(
 		.fout							(fout_j),
 		.fout_valid					(fout_j_valid),    
 	   .TX							(TX_JAWNY),
-      .semafor_out				(semafor_j),
-		.diod1					(dioda1),
-		.diod2					(dioda2),
-		.diod3					(dioda3),
-		.diod4					(dioda4),
-		.diod5					(dioda5),
-		.diod6					(dioda6),
-		.diod7					(dioda7),
-		.diod8					(dioda8),
-		.diod9					(dioda9),
-		.diod10					(dioda10)	
+      .semafor_out				(semafor_j)
+		//.diod1						(dioda1),
+		//.diod2						(dioda2),
+		//.diod3						(dioda3)
 		);
 
 Interface #(
 	.DATA_SIZE 			(DATA_SIZE),
-	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
+	.NONCE_SIZE			(0),
 	.FRAME_START      (FRAME_START),
 	.FRAME_END 	      (FRAME_END),
 	.ESC_VAL 		   (ESC_VAL),
@@ -138,6 +132,7 @@ Interface #(
 		.RX							(RX_TAJNY),
 		.semafor_in					(semafor_j),
 		.fin							(fin_t),
+		.diod3						(dioda4),
 		.fin_valid					(fin_t_valid),
 		.confirm						(confirm_tajny),
 		.conf_code					(confirm_code),
@@ -150,9 +145,9 @@ Interface #(
 	
 Core # (
 	.DATA_SIZE 			(DATA_SIZE),
-	.NONCE_SIZE			(NONCE_SIZE),
 	.PREAMBLE_SIZE		(PREAMBLE_SIZE),
 	.CRC_SIZE			(CRC_SIZE),
+	.NONCE_SIZE			(NONCE_SIZE),
 	.FRAME_START      (FRAME_START),
 	.FRAME_END 	      (FRAME_END),
 	.ESC_VAL 		   (ESC_VAL),
@@ -163,6 +158,10 @@ Core # (
 	.LAST_FRAME 	   (LAST_FRAME)) 
 
 	serce (
+		//.crc600in						(data_in600),
+		//.crc_en600						(crc_en600),
+		//.rst600							(rst_600),
+		//.crc600_din						(data_in600),
 		.clk								(clk),
 		.Fin_j							(fout_j),
 		.Fin_j_valid					(fout_j_valid),
@@ -173,23 +172,30 @@ Core # (
 		.confirm_from_jawny			(confirm_from_jawny),
 		.confirm_from_jawny_valid 	(confirm_from_jawny_valid),
 		
+		/////// aes //////
+		     
+		.res_aes									(res_aes),      
+		.start_aes                           (start_aes),    
+		.stop_aes                          (stop_aes),     
+		.nonce_aes                          (nonce_aes),    
+		.new_nonce                           (new_nonce),    
+		.key_in                           (key_in),       
+		.take_aes                           (take_aes),     
+		.ciphertext_aes                           (ciphertext_aes),
+		//////////////
+		
 		.conf_jawny			(confirm_jawny),
 		.conf_tajny			(confirm_tajny),
 		.conf_code			(confirm_code),
 		.Fout_j					(fin_j),
 		.Fout_j_valid			(fin_j_valid),
 		.Fout_t					(fin_t),
-		.Fout_t_valid			(fin_t_valid)
-//		.diod1					(dioda1),
-//		.diod2					(dioda2),
-//		.diod3					(dioda3),
-//		.diod4					(dioda4),
-//		.diod5					(dioda5),
-//		.diod6					(dioda6),
-//		.diod7					(dioda7),
-//		.diod8					(dioda8),
-//		.diod9					(dioda9),
-//		.diod10					(dioda10),
+		.Fout_t_valid			(fin_t_valid),
+		
+		.diod1						(dioda1),
+		.diod2						(dioda2),
+		.diod3						(dioda3)
+
 		
 		);
 	

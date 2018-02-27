@@ -1,9 +1,9 @@
 module Core (
 	input wire clk,
 	
-	input wire [0:FRAME_SIZE] 	Fin_j,
+	input wire [0:FRAME_SIZE_NONCE*8-1] 	Fin_j,
 	input wire 						Fin_j_valid,
-	input wire [0:FRAME_SIZE] 	Fin_t,
+	input wire [0:FRAME_SIZE*8-1] 	Fin_t,
 	input wire 						Fin_t_valid,
 	
 	input wire [7:0]				confirm_from_tajny,
@@ -12,31 +12,87 @@ module Core (
 	input wire [7:0]				confirm_from_jawny,
 	input wire 						confirm_from_jawny_valid,
 	
-	output wire [0:FRAME_SIZE] Fout_j,
+	////// aes///////////
+	output wire res_aes	,		
+	output wire start_aes   ,  
+	output wire stop_aes   ,   
+	output wire [95:0] nonce_aes ,    
+	output wire new_nonce ,    
+	output wire [127:0] key_in ,
+	
+	input wire take_aes  ,    
+	input wire [127:0] ciphertext_aes,
+	
+	
+	
+	
+	//////////////////////
+	input wire [31:0] crc600in,
+	
+
+	output reg rst600,
+	output wire [FRAME_SIZE*8-1:0] crc600_din,
+	
+	output wire [0:FRAME_SIZE_NONCE*8-1] Fout_j,
 	output wire 					Fout_j_valid,
-	output wire [0:FRAME_SIZE] Fout_t,
+	output wire [0:FRAME_SIZE*8-1] Fout_t,
 	output wire 					Fout_t_valid,
 	
 	output wire 					conf_tajny,
 	output wire 					conf_jawny,
 	output wire [7:0] 			conf_code,
-	output wire diod1, diod2, diod3, diod4, diod5, diod6, diod7, diod8, diod9, diod10
+	output wire	diod1, diod2, diod3, diod4, diod5, diod6, diod7, diod8, diod9, diod10
 	
 );
 
+assign crc600_din = frame_t;
 
-parameter NONCE_SIZE			= 12;
-parameter DATA_SIZE 			= 64;
-parameter PREAMBLE_SIZE 	= 7;
-parameter CRC_SIZE 			= 4;
+parameter NONCE_SIZE			= 0;
+parameter DATA_SIZE 			= 0;
+parameter PREAMBLE_SIZE 	= 0;
+parameter CRC_SIZE 			= 0;
 
-parameter FRAME_SIZE = (PREAMBLE_SIZE + DATA_SIZE + CRC_SIZE + NONCE_SIZE)*8-1;
+parameter INFO					=	PREAMBLE_SIZE 	+ CRC_SIZE;
+parameter FRAME_SIZE 		= 	PREAMBLE_SIZE+DATA_SIZE+CRC_SIZE;
+parameter FRAME_SIZE_NONCE = 	PREAMBLE_SIZE+NONCE_SIZE+DATA_SIZE+CRC_SIZE;
+
+reg [127:0] key1, key2;
 
 parameter [32:0] CRC_POLY = 33'h104c11db7;
 
+///////
+reg res_aes_w;		
+reg start_aes_w; 
+reg stop_aes_w;  
+reg [95:0] nonce_aes_w;    
+reg new_nonce_w;    
+reg [127:0] key_in_w;
+///////
+assign res_aes = res_aes_w;
+assign start_aes = start_aes_w;
+assign stop_aes = stop_aes_w;
+assign nonce_aes = nonce_aes_w;
+assign new_nonce = new_nonce_w;
+assign key_in = key_in_w;
+reg [0:7] typ;
+reg [0:7] IDo;
+reg [0:7] IDn;
+reg [0:31] Nr_Fr;
+reg [0:95] nonce;
 
-reg [0:FRAME_SIZE] frame;
-reg [0:FRAME_SIZE] frame_crc;
+reg [0:DATA_SIZE*8-1] data;
+reg [0:31] crc;
+
+wire [0:FRAME_SIZE*8-1] frame_t;
+wire [0:FRAME_SIZE_NONCE*8-1] frame_j;
+
+assign frame_t = {typ,IDo,IDn,Nr_Fr,data,crc};
+assign frame_j = {typ,IDo,IDn,Nr_Fr,nonce,data,crc};
+
+reg [0:FRAME_SIZE*8-1] frame;
+reg [0:FRAME_SIZE*8-1] frame_crc;
+
+
 
 reg [0:31] 	lastFrameNr;
 reg [1:0] 	which;
@@ -50,17 +106,18 @@ reg [7:0] 	confirm_code;
 integer counter;
 integer count_clk;
 
-reg [9:0] state;
-parameter [9:0]	IDLE 							= 10'b0000000001,
-						VALID_TYPE					= 10'b0000000010,
-						CRC_CHECK 					= 10'b0000000100,
-						RESET 						= 10'b0000001000,
-						FRAME_PROCESSED 			= 10'b0000010000,
-						HARD_RESET					= 10'b0000100000,
-						SIGN_ERROR					= 10'b0001000000,
-						PASS_FRAME					= 10'b0010000000,
-						WAIT_CLK						= 10'b0100000000,
-						WAIT_TX						= 10'b1000000000;  
+reg [10:0] state;
+parameter [10:0]	IDLE 							= 11'b00000000001,
+						VALID_TYPE					= 11'b00000000010,
+						CRC_CHECK 					= 11'b00000000100,
+						RESET 						= 11'b00000001000,
+						FRAME_PROCESSED 			= 11'b00000010000,
+						HARD_RESET					= 11'b00000100000,
+						SIGN_ERROR					= 11'b00001000000,
+						PASS_FRAME					= 11'b00010000000,
+						WAIT_CLK						= 11'b00100000000,
+						WAIT_TX						= 11'b01000000000,
+						ENCRYPT						= 11'b10000000000;            
 						
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -85,88 +142,106 @@ parameter [1:0] TAJNY = 2'b10;
 
 reg dioda1, dioda2, dioda3, dioda4, dioda5, dioda6, dioda7, dioda8, dioda9, dioda10;
 reg fat_err;
+integer licz;
+assign diod1 = dioda3;
+assign diod2 = dioda4;
+assign diod3 = dioda5;
+
+reg [127:0] ciph;
+
+integer count_aes;
+
 initial begin
+	typ				<= 8'h00;
+	IDo				<= 8'h00;
+	IDn				<= 8'h00;
+	Nr_Fr				<= {32{1'b0}};
+	nonce				<= {12{8'hff}};
+	data				<= {DATA_SIZE*8{1'b0}};
+	crc				<= {32{1'b0}};
+	count_aes		<= 0;
+	key1				<= {128{1'b0}};
+	key2				<= {128{1'b1}};
 	counter 			<= 0;
-	frame 			<= {FRAME_SIZE+1{1'b0}};
-	frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+	frame 			<= {FRAME_SIZE_NONCE*8{1'b0}};
+	frame_crc 		<= {FRAME_SIZE_NONCE*8{1'b0}};
 	state 			<= IDLE;
 	fout_j_valid 	<= 1'b0;
 	fout_t_valid 	<= 1'b0;
 	which 			<= 2'b00;
 	first 			<= 1'b0;
+	licz <= 0;
 	confirm_code 	<= 8'h00;
 	lastFrameNr 	<= {32{1'b0}};
 	fat_err			<=	1'b0;
-	
-//	dioda1 			<= 1'b0;
-//	dioda2 			<= 1'b0;
-//	dioda3 			<= 1'b0;
-//	dioda4 			<= 1'b0;
-//	dioda5 			<= 1'b0;
-//	dioda6 			<= 1'b0;
-//	dioda7 			<= 1'b0;
-//	dioda8 			<= 1'b0;
-//	dioda9 			<= 1'b0;
-//	dioda10 			<= 1'b0;
+	//nonce				<= {96{1'b0}};
 	count_clk		<= 0;
+	dioda1 <= 1'b0;
+	dioda2 <= 1'b0;
+	dioda3 <= 1'b0;
+	dioda4 <= 1'b0;
+	dioda5 <= 1'b0;
+	dioda6 <= 1'b0;
+	dioda7 <= 1'b0;
+	dioda8 <= 1'b0;
+	dioda9 <= 1'b0;
+	dioda10 <= 1'b0;
+	//dioda5 <= 1'b0;
+	//dioda6 <= 1'b0;
 end
 
-//assign diod1 = dioda1;	
-//assign diod2 = dioda2;	
-//assign diod3 = dioda3;	
-//assign diod4 = dioda4;	
-//assign diod5 = dioda5;	
-//assign diod6 = dioda6;	
-//assign diod7 = dioda7;	
-//assign diod8 = dioda8;	
-//assign diod9 = dioda9;	
-//assign diod10 = dioda10;						
+//assign diod1 = dioda1;
+//assign diod2 = dioda2;
+//assign diod3 = dioda3;						
 						
 always @ (posedge clk) begin
 	case (state)
 	
 		IDLE: begin	
 			if (Fin_j_valid) begin
-				frame <= Fin_j;
-				frame_crc <= Fin_j;
+				//frame <= {Fin_j[0:55],Fin_j[152:FRAME_SIZE*8-1]};
+				//nonce <= Fin_j[56:151];
+				typ	<=	Fin_j[0:7];
+				IDo	<= Fin_j[8:15];
+				IDn	<= Fin_j[16:23];
+				Nr_Fr <= Fin_j[24:55];
+				nonce <= Fin_j[56:151];
+				data  <= Fin_j[152:FRAME_SIZE_NONCE*8-33];
+				crc	<= Fin_j[FRAME_SIZE_NONCE*8-32:FRAME_SIZE_NONCE*8-1];
 				which <= JAWNY;
-				//confirm_code <= OKAY;
-				//	confirm_jawny <= 1'b1;
-				//	confirm_tajny <= 1'b1;
-				//dioda <= 1'b1;
 				state <= VALID_TYPE;
 			end
 			if (Fin_t_valid) begin
-				frame <= Fin_t;
-				frame_crc <= Fin_t;
+				typ	<=	Fin_t[0:7];
+				IDo	<= Fin_t[8:15];
+				IDn	<= Fin_t[16:23];
+				Nr_Fr <= Fin_t[24:55];
+				data  <= Fin_t[56:FRAME_SIZE*8-33];
+				crc	<= Fin_t[FRAME_SIZE*8-32:FRAME_SIZE*8-1];
 				which <= TAJNY;
-				//confirm_code <= OKAY;
-				//	confirm_jawny <= 1'b1;
-				//	confirm_tajny <= 1'b1;
-				//dioda <= 1'b1;
 				state <= VALID_TYPE;
 			end
 		end
 		
 		VALID_TYPE: begin
-		case (frame[0:7])
+		
+		count_aes <= 0;
+		case (typ)
 		
 			FIRST_FRAME: begin
-				if (frame[0:7] == FIRST_FRAME) begin
-					if (first) begin // byla juz pierwsza
-						confirm_code <= ERROR;
-						state <= SIGN_ERROR;
-					end
-					if (!first) begin
-						//confirm_jawny <= 1'b1;
-						//confirm_tajny <= 1'b1;
-						//confirm_code <= OKAY;
-						//state <= SIGN_ERROR;
-						first <= 1'b1;
-						state <= CRC_CHECK;
-						lastFrameNr <= frame[24:55];
-						//dioda1 <= 1'b1;
-					end
+				if (first) begin // byla juz pierwsza
+					confirm_code <= ERROR;
+					state <= SIGN_ERROR;
+				end
+				if (!first) begin
+					//confirm_jawny <= 1'b1;
+					//confirm_tajny <= 1'b1;
+					//confirm_code <= OKAY;
+					//state <= SIGN_ERROR;
+					first <= 1'b1;
+					state <= CRC_CHECK;
+					lastFrameNr <= Nr_Fr;
+					//dioda1 <= 1'b1;
 				end
 			end
 			
@@ -176,7 +251,7 @@ always @ (posedge clk) begin
 					state <= SIGN_ERROR;
 				end
 				if (first) begin
-					if (frame[24:55] == (lastFrameNr + 1)) begin
+					if (Nr_Fr == (lastFrameNr + 1)) begin
 						state <= CRC_CHECK;
 						lastFrameNr <= lastFrameNr + 1;
 					end else begin
@@ -202,7 +277,7 @@ always @ (posedge clk) begin
 					state <= SIGN_ERROR;
 				end
 				if (first) begin
-					if (frame[24:55] == (lastFrameNr + 1)) begin
+					if (Nr_Fr == (lastFrameNr + 1)) begin
 						state <= CRC_CHECK;
 						lastFrameNr <= {32{1'b0}};
 						first <= 1'b0;
@@ -213,30 +288,42 @@ always @ (posedge clk) begin
 		endcase
 		end
 		
-		CRC_CHECK: begin
-//			if (counter <= (DATA_SIZE+7)*8-2 && frame_crc[counter] == 1'b1) begin
-//				frame_crc <= (frame_crc[counter+:33] ^ CRC_POLY);
-//			end
-//			if (counter == (DATA_SIZE+7)*8-1) begin
-//				if (frame_crc[((DATA_SIZE+7)*8-1)+:32] == 32'h00000000) begin
-//					//dioda2 <= 1'b1;
-//					state <= PASS_FRAME;
-					if (which == JAWNY) begin
-						fout_t_valid <= 1'b1;
-						state <= FRAME_PROCESSED;
-					end
-					if (which == TAJNY) begin
-						fout_j_valid <= 1'b1;
-						state <= FRAME_PROCESSED;
-					end
-//				end
-//			end
-//			counter <= counter + 1;
+		CRC_CHECK: begin	
+					state <= ENCRYPT;
+		end
+		
+		ENCRYPT: begin
+			count_aes <= count_aes + 1;
+			if (count_aes == 0) begin
+				res_aes_w <= 1'b1;
+				nonce_aes_w <= nonce;
+				if (IDo == 8'h00) begin
+					key_in_w <= key1;
+				end
+				if (IDo == 8'h01) begin
+					key_in_w <= key2;
+				end
+			end
+			if (count_aes == 1) begin
+				res_aes_w <= 1'b0;
+			end
+			if (count_aes == 2) begin
+				start_aes_w <= 1'b1;
+			end
+			if (count_aes > 2 ) begin
+				if (take_aes) begin
+					dioda3 <= 1'b1;
+					//ciph <= ciphertext_aes;
+					data[0:127] <= data[0:127] ^ ciphertext_aes[127:0];
+					state <= PASS_FRAME;
+				end
+			end
 		end
 		
 		PASS_FRAME: begin
 			count_clk <= 0;
 			if (which == JAWNY) begin
+				//dioda3 <= 1'b1;
 				fout_t_valid <= 1'b1;
 				state <= FRAME_PROCESSED;
 			end
@@ -263,31 +350,16 @@ always @ (posedge clk) begin
 			case(which)
 				TAJNY: begin
 					if (confirm_from_jawny_valid) begin
+					//dioda8 <= 1'b1;
+					dioda3 <= 1'b1;
 						if (confirm_from_jawny == OKAY) begin
-							confirm_code <= OKAY;
+							if (typ == LAST_FRAME) begin
+								confirm_code <= OKAY ^ 8'h10;
+							end else begin
+								confirm_code <= OKAY;
+								//dioda4 <= 1'b1;
+							end
 							confirm_tajny <= 1'b1;
-							state <= SIGN_ERROR;
-						end
-						if (confirm_from_jawny == ERROR) begin
-							state <= WAIT_TX;
-						end
-						if (confirm_from_jawny == FATAL_ERROR) begin
-							confirm_code <= FATAL_ERROR;
-							fat_err <= 1'b1;
-							confirm_tajny <= 1'b1;
-							state <= WAIT_TX;
-						end
-						if (confirm_from_jawny != OKAY && confirm_from_jawny != ERROR && confirm_from_jawny != FATAL_ERROR) begin
-							dioda10 <= 1'b1;
-						end
-					end
-				end
-				
-				JAWNY: begin
-					if (confirm_from_tajny_valid) begin
-						if (confirm_from_tajny == OKAY) begin
-							confirm_code <= OKAY;
-							confirm_jawny <= 1'b1;
 							state <= SIGN_ERROR; // zamiast reset
 						end
 						if (confirm_from_tajny == ERROR) begin
@@ -296,7 +368,31 @@ always @ (posedge clk) begin
 						if (confirm_from_tajny == FATAL_ERROR) begin
 							confirm_code <= FATAL_ERROR;
 							confirm_tajny <= 1'b1;
-							state <= HARD_RESET;
+							state <= SIGN_ERROR;
+						end
+					end
+				end
+				
+				JAWNY: begin
+					//dioda6 <= 1'b1;
+					if (confirm_from_tajny_valid) begin
+					//dioda8 <= 1'b1;
+						if (confirm_from_tajny == OKAY) begin
+							if (typ == LAST_FRAME) begin
+								confirm_code <= OKAY ^ 8'h10;
+							end else begin
+								confirm_code <= OKAY;
+							end
+							confirm_jawny <= 1'b1;
+							state <= SIGN_ERROR; // zamiast reset
+						end
+						if (confirm_from_tajny == ERROR) begin
+							state <= PASS_FRAME;
+						end
+						if (confirm_from_tajny == FATAL_ERROR) begin
+							confirm_code <= FATAL_ERROR;
+							confirm_jawny <= 1'b1;
+							state <= SIGN_ERROR;
 						end
 					end
 				end
@@ -304,50 +400,74 @@ always @ (posedge clk) begin
 		end
 		
 		WAIT_CLK: begin
-			state <= RESET;
-		end
+			if (licz >= 5) begin
+				state <= RESET;
+			end
+			licz <= licz + 1;
+			end
 		
 		SIGN_ERROR: begin
+		dioda5 <= 1'b1;
 		case (which)
 			JAWNY: begin
 			//dioda9 <= 1'b1;
 				confirm_jawny <= 1'b1;
-				state <= RESET;		// zmienione z reseta
+				state <= WAIT_CLK;		// zmienione z reseta
 			end
 			TAJNY: begin
 			//dioda10 <= 1'b1;
 				confirm_tajny <= 1'b1;
-				state <= RESET;		// zmienione z reseta
+				state <= WAIT_CLK;		// zmienione z reseta
 			end	
 		endcase
 		end
 		
 		HARD_RESET: begin
+			typ				<= 8'h00;
+	IDo				<= 8'h00;
+	IDn				<= 8'h00;
+	Nr_Fr				<= {32{1'b0}};
+	nonce				<= {12{8'h66}};
+	data				<= {DATA_SIZE*8{1'b0}};
+	crc				<= {32{1'b0}};
+	licz <= 0;
 			counter 			<= 0;
-			frame 			<= {FRAME_SIZE+1{1'b0}};
-			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+			frame 			<= {FRAME_SIZE_NONCE*8{1'b0}};
+			frame_crc 		<= {FRAME_SIZE_NONCE*8{1'b0}};
 			state 			<= IDLE;
 			fout_j_valid 	<= 1'b0;
 			fout_t_valid 	<= 1'b0;
+			count_aes		<= 0;
 			which 			<= 2'b00;
 			first 			<= 1'b0;
 			confirm_code 	<= 8'h00;
 			lastFrameNr 	<= {32{1'b0}};
 			fat_err			<=	1'b0;
+			nonce				<= {12{8'hff}};
 		end
 		
 		RESET: begin
+			licz <= 0;
+			typ				<= 8'h00;
+			IDo				<= 8'h00;
+			IDn				<= 8'h00;
+			Nr_Fr				<= {32{1'b0}};
+			nonce				<= {12{8'hff}};
+			data				<= {DATA_SIZE*8{1'b0}};
+			crc				<= {32{1'b0}};
 			count_clk		<= 0;
+			count_aes		<= 0;
 			confirm_jawny	<=	1'b0;
 			confirm_tajny	<=	1'b0;
 			confirm_code	<= 8'h00;
 			counter 			<= 0;
-			frame				<= {FRAME_SIZE+1{1'b0}};
-			frame_crc 		<= {FRAME_SIZE+1{1'b0}};
+			frame				<= {FRAME_SIZE_NONCE*8{1'b0}};
+			frame_crc 		<= {FRAME_SIZE_NONCE*8{1'b0}};
 			state 			<= IDLE;
 			fout_j_valid 	<= 1'b0;
 			fout_t_valid 	<= 1'b0;
 			which 			<= 2'b00;
+			nonce				<= {12{8'h66}};
 		end
 		
 		
@@ -357,10 +477,10 @@ end
 assign conf_code = confirm_code;
 assign conf_jawny = confirm_jawny;
 assign conf_tajny = confirm_tajny;
-assign Fout_j = frame;
+assign Fout_j = frame_j;
 assign Fout_j_valid = fout_j_valid;
 
-assign Fout_t = frame;
+assign Fout_t = frame_t;
 assign Fout_t_valid = fout_t_valid;
 
 endmodule
