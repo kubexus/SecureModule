@@ -55,7 +55,9 @@ wire semafor_j, semafor_t;
 wire [7:0] confirm_code, confirm_from_jawny, confirm_from_tajny;
 wire confirm_from_PC_valid, confirm, confirm_from_tajny_valid, confirm_from_jawny_valid, confirm_jawny, confirm_tajny;
 
-
+wire [95:0] nonce_aes;
+wire [127:0] key_in;
+wire [127:0] ciphertext_aes;
 
 encrypter aes ( 
 	.clock		(clk),     

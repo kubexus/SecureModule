@@ -106,18 +106,19 @@ reg [7:0] 	confirm_code;
 integer counter;
 integer count_clk;
 
-reg [10:0] state;
-parameter [10:0]	IDLE 							= 11'b00000000001,
-						VALID_TYPE					= 11'b00000000010,
-						CRC_CHECK 					= 11'b00000000100,
-						RESET 						= 11'b00000001000,
-						FRAME_PROCESSED 			= 11'b00000010000,
-						HARD_RESET					= 11'b00000100000,
-						SIGN_ERROR					= 11'b00001000000,
-						PASS_FRAME					= 11'b00010000000,
-						WAIT_CLK						= 11'b00100000000,
-						WAIT_TX						= 11'b01000000000,
-						ENCRYPT						= 11'b10000000000;            
+reg [11:0] state;
+parameter [11:0]	IDLE 							= 12'b000000000001,
+						VALID_TYPE					= 12'b000000000010,
+						CRC_CHECK 					= 12'b000000000100,
+						RESET 						= 12'b000000001000,
+						FRAME_PROCESSED 			= 12'b000000010000,
+						HARD_RESET					= 12'b000000100000,
+						SIGN_ERROR					= 12'b000001000000,
+						PASS_FRAME					= 12'b000010000000,
+						WAIT_CLK						= 12'b000100000000,
+						WAIT_TX						= 12'b001000000000,
+						ENCRYPT						= 12'b010000000000,
+						XOROWANIE					= 12'b100000000000;           
 						
 // TYPY RAMEK
 parameter [7:0]	FIRST_FRAME 		=	8'h00;
@@ -150,7 +151,7 @@ assign diod3 = dioda5;
 reg [127:0] ciph;
 
 integer count_aes;
-
+integer encrypt_repeat;
 initial begin
 	typ				<= 8'h00;
 	IDo				<= 8'h00;
@@ -170,6 +171,7 @@ initial begin
 	fout_t_valid 	<= 1'b0;
 	which 			<= 2'b00;
 	first 			<= 1'b0;
+	encrypt_repeat <= 0;
 	licz <= 0;
 	confirm_code 	<= 8'h00;
 	lastFrameNr 	<= {32{1'b0}};
@@ -229,94 +231,112 @@ always @ (posedge clk) begin
 		case (typ)
 		
 			FIRST_FRAME: begin
-				if (first) begin // byla juz pierwsza
-					confirm_code <= ERROR;
-					state <= SIGN_ERROR;
-				end
-				if (!first) begin
-					//confirm_jawny <= 1'b1;
-					//confirm_tajny <= 1'b1;
-					//confirm_code <= OKAY;
-					//state <= SIGN_ERROR;
-					first <= 1'b1;
-					state <= CRC_CHECK;
-					lastFrameNr <= Nr_Fr;
-					//dioda1 <= 1'b1;
-				end
+//				if (first) begin // byla juz pierwsza
+//					confirm_code <= ERROR;
+//					state <= SIGN_ERROR;
+//				end
+//				if (!first) begin
+//					first <= 1'b1;
+//					state <= CRC_CHECK;
+//					lastFrameNr <= Nr_Fr;
+//				end
+				res_aes_w <= 1'b1;
+				if (IDo == 8'h00)
+					key_in_w <= key1;
+				if (IDo == 8'h01)
+					key_in_w <= key2;
+				new_nonce_w <= 1'b1;
+				nonce_aes_w <= nonce;
+				state <= CRC_CHECK;
 			end
 			
 			NORMALNA: begin
-				if (!first) begin
-					confirm_code <= ERROR;
-					state <= SIGN_ERROR;
-				end
-				if (first) begin
-					if (Nr_Fr == (lastFrameNr + 1)) begin
-						state <= CRC_CHECK;
-						lastFrameNr <= lastFrameNr + 1;
-					end else begin
-						confirm_code <= ERROR;
-						state <= SIGN_ERROR;
-					end
-				end
+//				if (!first) begin
+//					confirm_code <= ERROR;
+//					state <= SIGN_ERROR;
+//				end
+//				if (first) begin
+//					if (Nr_Fr == (lastFrameNr + 1)) begin
+//						state <= CRC_CHECK;
+//						lastFrameNr <= lastFrameNr + 1;
+//					end else begin
+//						confirm_code <= ERROR;
+//						state <= SIGN_ERROR;
+//					end
+//				end
+				new_nonce_w <= 1'b1;
+				nonce_aes_w <= nonce;
+				state <= CRC_CHECK;
 			end
 			
 			POJEDYNCZA: begin
-				if (first) begin
-					confirm_code <= ERROR;
-					state <= SIGN_ERROR;
-				end
-				if (!first) begin
-					state <= CRC_CHECK;
-				end
+//				if (first) begin
+//					confirm_code <= ERROR;
+//					state <= SIGN_ERROR;
+//				end
+//				if (!first) begin
+//					state <= CRC_CHECK;
+//				end
+				if (IDo == 8'h00)
+					key_in_w <= key1;
+				if (IDo == 8'h01)
+					key_in_w <= key2;
+				res_aes_w <= 1'b1;
+				new_nonce_w <= 1'b1;
+				nonce_aes_w <= nonce;
+				state <= CRC_CHECK;
 			end
 			
 			LAST_FRAME: begin
-				if (!first) begin
-					confirm_code <= ERROR;
-					state <= SIGN_ERROR;
-				end
-				if (first) begin
-					if (Nr_Fr == (lastFrameNr + 1)) begin
-						state <= CRC_CHECK;
-						lastFrameNr <= {32{1'b0}};
-						first <= 1'b0;
-					end
-				end
+//				if (!first) begin
+//					confirm_code <= ERROR;
+//					state <= SIGN_ERROR;
+//				end
+//				if (first) begin
+//					if (Nr_Fr == (lastFrameNr + 1)) begin
+//						state <= CRC_CHECK;
+//						lastFrameNr <= {32{1'b0}};
+//						first <= 1'b0;
+//					end
+//				end
+				new_nonce_w <= 1'b1;
+				nonce_aes_w <= nonce;
+				state <= CRC_CHECK;
 			end
 			
 		endcase
 		end
 		
 		CRC_CHECK: begin	
+					res_aes_w <= 1'b0;
+					new_nonce_w <= 1'b0;
 					state <= ENCRYPT;
 		end
 		
 		ENCRYPT: begin
 			count_aes <= count_aes + 1;
 			if (count_aes == 0) begin
-				res_aes_w <= 1'b1;
-				nonce_aes_w <= nonce;
-				if (IDo == 8'h00) begin
-					key_in_w <= key1;
-				end
-				if (IDo == 8'h01) begin
-					key_in_w <= key2;
-				end
-			end
-			if (count_aes == 1) begin
-				res_aes_w <= 1'b0;
-			end
-			if (count_aes == 2) begin
 				start_aes_w <= 1'b1;
+				stop_aes_w <= 1'b0;
 			end
-			if (count_aes > 2 ) begin
+			if (count_aes > 0 ) begin
 				if (take_aes) begin
 					dioda3 <= 1'b1;
-					//ciph <= ciphertext_aes;
-					data[0:127] <= data[0:127] ^ ciphertext_aes[127:0];
-					state <= PASS_FRAME;
+					encrypt_repeat <= encrypt_repeat + 1;
+					state <= XOROWANIE;
 				end
+			end
+		end
+		
+		XOROWANIE: begin
+			count_aes <= 0;
+			if (encrypt_repeat <= 4) begin
+				data[(encrypt_repeat-1)*128+:128] <= data[(encrypt_repeat-1)*128+:128] ^ ciphertext_aes;
+				state <= ENCRYPT;
+			end else begin
+				state <= PASS_FRAME;
+				start_aes_w <= 1'b0;
+				stop_aes_w <= 1'b1;
 			end
 		end
 		
@@ -351,9 +371,9 @@ always @ (posedge clk) begin
 				TAJNY: begin
 					if (confirm_from_jawny_valid) begin
 					//dioda8 <= 1'b1;
-					dioda3 <= 1'b1;
+					
 						if (confirm_from_jawny == OKAY) begin
-							if (typ == LAST_FRAME) begin
+							if (typ == LAST_FRAME || typ==POJEDYNCZA) begin
 								confirm_code <= OKAY ^ 8'h10;
 							end else begin
 								confirm_code <= OKAY;
@@ -423,6 +443,7 @@ always @ (posedge clk) begin
 		end
 		
 		HARD_RESET: begin
+			encrypt_repeat <= 0;
 			typ				<= 8'h00;
 	IDo				<= 8'h00;
 	IDn				<= 8'h00;
@@ -438,6 +459,7 @@ always @ (posedge clk) begin
 			fout_j_valid 	<= 1'b0;
 			fout_t_valid 	<= 1'b0;
 			count_aes		<= 0;
+			encrypt_repeat <= 0;
 			which 			<= 2'b00;
 			first 			<= 1'b0;
 			confirm_code 	<= 8'h00;
@@ -466,6 +488,7 @@ always @ (posedge clk) begin
 			state 			<= IDLE;
 			fout_j_valid 	<= 1'b0;
 			fout_t_valid 	<= 1'b0;
+			encrypt_repeat <= 0;
 			which 			<= 2'b00;
 			nonce				<= {12{8'h66}};
 		end

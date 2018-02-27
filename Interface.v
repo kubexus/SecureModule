@@ -65,7 +65,7 @@ parameter [9:0]	IDLE 					= 10'b0000000001,
 						HARD_RESET			= 10'b1000000000;        
 						
 reg 	[9:0] 			state; 
-
+reg fat_err;
 reg [7:0]	confirm_from_PC;
 reg 			confirm_from_PC_valid;
 			
@@ -119,6 +119,7 @@ initial begin
 	confirm_from_PC			<= 8'h00;
 	confirm_from_PC_valid	<= 1'b0;
 	count_clk					<= 0;
+	fat_err <= 1'b0;
 	temp <= 1'b0;
 	dioda1 <= 1'b0;
 	dioda2 <= 1'b0;
@@ -271,7 +272,7 @@ case(state)
 	
 	WAIT_TX: begin
 		if (tx_ready) begin
-			if (byte_out == OKAY ^ 8'h10) begin
+			if (fat_err == 1'b1) begin
 				state <= HARD_RESET;
 			end else begin
 				state <= RESET;
@@ -298,7 +299,12 @@ case(state)
 	CONFIRM: begin
 		if (confirm) begin
 			dioda3 <= 1'b1;
-			byte_out <= conf_code; // albo OKAY
+			if (conf_code == OKAY ^ 8'h10) begin
+				byte_out <= OKAY;
+				fat_err <= 1'b1;
+			end else begin
+				byte_out <= conf_code;
+			end
 			transmit_frame <= 1'b1;
 			state <= WAIT_TX;
 		end
@@ -333,6 +339,7 @@ case(state)
 		state							<=	IDLE;
 		confirm_from_PC			<= 8'h00;
 		confirm_from_PC_valid	<= 1'b0;
+		fat_err <= 1'b0;
 	end
 	
 endcase	
