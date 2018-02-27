@@ -355,11 +355,11 @@ always @ (posedge clk) begin
 		
 		WAIT_TX: begin
 			if (count_clk == 450) begin // bylo 1000
-				if (fat_err) begin
-					state <= HARD_RESET;
-				end else begin
+				//if (fat_err) begin
+				//	state <= HARD_RESET;
+				//end else begin
 					state <= PASS_FRAME;
-				end
+				//end
 			end
 			count_clk <= count_clk + 1;
 		end
@@ -373,19 +373,19 @@ always @ (posedge clk) begin
 					//dioda8 <= 1'b1;
 					
 						if (confirm_from_jawny == OKAY) begin
-							if (typ == LAST_FRAME || typ==POJEDYNCZA) begin
-								confirm_code <= OKAY ^ 8'h10;
-							end else begin
+							//if (typ == LAST_FRAME || typ==POJEDYNCZA) begin
+							//	confirm_code <= OKAY ^ 8'h10;
+							//end else begin
 								confirm_code <= OKAY;
 								//dioda4 <= 1'b1;
-							end
+							//end
 							confirm_tajny <= 1'b1;
 							state <= SIGN_ERROR; // zamiast reset
 						end
-						if (confirm_from_tajny == ERROR) begin
+						if (confirm_from_jawny == ERROR) begin
 							state <= PASS_FRAME;
 						end
-						if (confirm_from_tajny == FATAL_ERROR) begin
+						if (confirm_from_jawny == FATAL_ERROR) begin
 							confirm_code <= FATAL_ERROR;
 							confirm_tajny <= 1'b1;
 							state <= SIGN_ERROR;
@@ -398,7 +398,7 @@ always @ (posedge clk) begin
 					if (confirm_from_tajny_valid) begin
 					//dioda8 <= 1'b1;
 						if (confirm_from_tajny == OKAY) begin
-							if (typ == LAST_FRAME) begin
+							if (typ == LAST_FRAME || typ == POJEDYNCZA) begin
 								confirm_code <= OKAY ^ 8'h10;
 							end else begin
 								confirm_code <= OKAY;
@@ -421,7 +421,11 @@ always @ (posedge clk) begin
 		
 		WAIT_CLK: begin
 			if (licz >= 5) begin
-				state <= RESET;
+				//if (confirm_code <= OKAY ^ 8'h10) begin
+				//	state <= HARD_RESET;
+				//end else begin
+					state <= RESET;
+				//end
 			end
 			licz <= licz + 1;
 			end
@@ -431,7 +435,7 @@ always @ (posedge clk) begin
 		case (which)
 			JAWNY: begin
 			//dioda9 <= 1'b1;
-				confirm_jawny <= 1'b1;
+				confirm_jawny <= 1'b1; // tu chyba odwrotnie ////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				state <= WAIT_CLK;		// zmienione z reseta
 			end
 			TAJNY: begin
@@ -465,7 +469,7 @@ always @ (posedge clk) begin
 			confirm_code 	<= 8'h00;
 			lastFrameNr 	<= {32{1'b0}};
 			fat_err			<=	1'b0;
-			nonce				<= {12{8'hff}};
+			nonce				<= nonce + 1;
 		end
 		
 		RESET: begin
@@ -474,7 +478,7 @@ always @ (posedge clk) begin
 			IDo				<= 8'h00;
 			IDn				<= 8'h00;
 			Nr_Fr				<= {32{1'b0}};
-			nonce				<= {12{8'hff}};
+			nonce				<= nonce + 1;
 			data				<= {DATA_SIZE*8{1'b0}};
 			crc				<= {32{1'b0}};
 			count_clk		<= 0;

@@ -272,11 +272,11 @@ case(state)
 	
 	WAIT_TX: begin
 		if (tx_ready) begin
-			if (fat_err == 1'b1) begin
-				state <= HARD_RESET;
-			end else begin
+			//if (fat_err == 1'b1) begin
+			//	state <= HARD_RESET;
+			//end else begin
 				state <= RESET;
-			end
+			//end
 		end
 	end
 	
